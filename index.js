@@ -18,13 +18,29 @@ const state = {
 function drawGrid(w, h, unit, strokeStyle) {
   ctx.beginPath();
   for (let x=0; x<=w; x+=unit) {
-    ctx.moveTo(x, 0); ctx.lineTo(x, h); // vertical line
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
   }
   for (let y=0; y<=h; y+=unit) {
-    ctx.moveTo(0, y); ctx.lineTo(w, y); // horizontal line
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
   }
   ctx.strokeStyle = strokeStyle;
   ctx.stroke();
+}
+
+function drawCoprimes(fillStyle) {
+  const r = unitSize / 4;
+  ctx.fillStyle = fillStyle;
+  for (let x=0; x<=canvas.width/unitSize; x++) {
+    for (let y=0; y<=canvas.height/unitSize; y++) {
+      if (x !== y && gcd(x,y) !== 1) {
+        ctx.beginPath();
+        ctx.ellipse(x*unitSize,y*unitSize,r,r,0,0,Math.PI*2);
+        ctx.fill();
+      }
+    }
+  }
 }
 
 function drawBox() {
@@ -54,6 +70,7 @@ function drawBox() {
 function draw() {
   ctx.clearRect(0,0,canvas.width, canvas.height);
   drawGrid(canvas.width, canvas.height, unitSize, "#f5f5f5");
+  drawCoprimes("#f5f5f5");
   drawBox();
 }
 
@@ -68,8 +85,8 @@ document.body.onresize = resizeCanvas;
 
 function onMouseUpdate(e, mousedown) {
   if (mousedown) {
-    state.w = Math.ceil(e.offsetX / unitSize);
-    state.h = Math.ceil(e.offsetY / unitSize);
+    state.w = Math.round(e.offsetX / unitSize);
+    state.h = Math.round(e.offsetY / unitSize);
     draw();
   }
 }
