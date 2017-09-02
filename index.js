@@ -33,7 +33,7 @@ function drawCoprimes(fillStyle) {
   const r = unitSize / 4;
   for (let x=0; x<=canvas.width/unitSize; x++) {
     for (let y=0; y<=canvas.height/unitSize; y++) {
-      if (x !== y && gcd(x,y) !== 1) {
+      if (gcd(x,y) !== 1) {
         ctx.beginPath();
         ctx.fillStyle = (x === state.w && y === state.h) ? "#555" : fillStyle;
         ctx.ellipse(x*unitSize,y*unitSize,r,r,0,0,Math.PI*2);
@@ -53,7 +53,7 @@ function drawBox() {
 
   const relUnit = gcd(state.w, state.h);
   if (relUnit !== 1) {
-    drawGrid(w, h, relUnit*unitSize, "rgba(40,70,100,0.3)");
+    drawGrid(canvas.width, canvas.height, relUnit*unitSize, "rgba(40,70,100,0.3)");
   }
 
   const pad = unitSize/2;
