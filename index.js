@@ -4,47 +4,56 @@ const ctx = canvas.getContext('2d');
 
 const unitSize = 20;
 
+function gcd(n0, n1) {
+  const a = Math.max(n0, n1);
+  const b = Math.min(n0, n1);
+  return (b === 0) ? a : gcd(b, a % b);
+}
+
 const state = {
-  width: 0,
-  height: 0,
+  w: 1,
+  h: 1,
 };
 
-function drawGrid() {
+function drawGrid(w, h, unit, strokeStyle) {
   ctx.beginPath();
-  const right = canvas.width;
-  const bottom = canvas.height;
-  for (let x=0; x<right; x+=unitSize) {
-    for (let y=0; y<bottom; y+=unitSize) {
-      ctx.moveTo(x, 0); ctx.lineTo(x, bottom); // vertical line
-      ctx.moveTo(0, y); ctx.lineTo(right, y); // horizontal line
-    }
+  for (let x=0; x<=w; x+=unit) {
+    ctx.moveTo(x, 0); ctx.lineTo(x, h); // vertical line
   }
-  ctx.strokeStyle = "#f5f5f5";
+  for (let y=0; y<=h; y+=unit) {
+    ctx.moveTo(0, y); ctx.lineTo(w, y); // horizontal line
+  }
+  ctx.strokeStyle = strokeStyle;
   ctx.stroke();
 }
 
 function drawBox() {
   ctx.strokeStyle = "#555";
   ctx.fillStyle = "rgba(40,70,100,0.2)";
-  const w = state.width * unitSize;
-  const h = state.height * unitSize;
+  const w = state.w * unitSize;
+  const h = state.h * unitSize;
   ctx.fillRect(0, 0, w, h);
   ctx.strokeRect(0, 0, w, h);
+
+  const relUnit = gcd(state.w, state.h);
+  if (relUnit !== 1) {
+    drawGrid(w, h, relUnit*unitSize, "rgba(40,70,100,0.3)");
+  }
 
   const pad = unitSize/2;
   ctx.fillStyle = "#555";
   ctx.font = '20px Helvetica';
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
-  ctx.fillText(state.height, w + pad, h/2);
+  ctx.fillText(state.h, w + pad, h/2);
   ctx.textBaseline = 'top';
   ctx.textAlign = 'center';
-  ctx.fillText(state.width, w/2, h + pad);
+  ctx.fillText(state.w, w/2, h + pad);
 }
 
 function draw() {
   ctx.clearRect(0,0,canvas.width, canvas.height);
-  drawGrid();
+  drawGrid(canvas.width, canvas.height, unitSize, "#f5f5f5");
   drawBox();
 }
 
@@ -59,8 +68,8 @@ document.body.onresize = resizeCanvas;
 
 function onMouseUpdate(e, mousedown) {
   if (mousedown) {
-    state.width = Math.ceil(e.offsetX / unitSize);
-    state.height = Math.ceil(e.offsetY / unitSize);
+    state.w = Math.ceil(e.offsetX / unitSize);
+    state.h = Math.ceil(e.offsetY / unitSize);
     draw();
   }
 }
