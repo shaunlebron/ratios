@@ -46,19 +46,20 @@ function drawNonCoprimes(fillStyle) {
 }
 
 function drawBox() {
+  const w = state.w * unitSize;
+  const h = state.h * unitSize;
+
   const scale = gcd(state.w, state.h);
-  let opacity = scale === 1 ? 0.08 : 0.2;
 
   drawGrid(canvas.width, canvas.height, unitSize, "rgba(40,70,100,0.08)");
   if (scale !== 1) {
     drawGrid(canvas.width, canvas.height, scale*unitSize, `rgba(40,70,100,0.2)`);
+    drawGrid(w, h, scale*unitSize, `rgba(40,70,100,0.4)`);
   }
 
   ctx.strokeStyle = "#555";
-  opacity = scale === 1 ? 0.15 : 0.3;
+  const opacity = scale === 1 ? 0.15 : 0.3;
   ctx.fillStyle = `rgba(40,70,100,${opacity})`;
-  const w = state.w * unitSize;
-  const h = state.h * unitSize;
   ctx.fillRect(0, 0, w, h);
   ctx.strokeRect(0, 0, w, h);
 
