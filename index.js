@@ -30,6 +30,16 @@ function drawBox() {
   const h = state.height * unitSize;
   ctx.fillRect(0, 0, w, h);
   ctx.strokeRect(0, 0, w, h);
+
+  const pad = unitSize/2;
+  ctx.fillStyle = "#555";
+  ctx.font = '20px Helvetica';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.fillText(state.height, w + pad, h/2);
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'center';
+  ctx.fillText(state.width, w/2, h + pad);
 }
 
 function draw() {
