@@ -29,15 +29,16 @@ function drawGrid(w, h, unit, strokeStyle) {
   ctx.stroke();
 }
 
-function drawCoprimes(fillStyle) {
-  const r = unitSize / 4;
-  for (let x=0; x<=canvas.width/unitSize; x++) {
-    for (let y=0; y<=canvas.height/unitSize; y++) {
-      if (gcd(x,y) !== 1) {
+function drawNonCoprimes(fillStyle) {
+  for (let x=1; x<=canvas.width/unitSize; x++) {
+    for (let y=1; y<=canvas.height/unitSize; y++) {
+      const scale = gcd(x,y);
+      if (scale !== 1) {
+        const r = scale;
         ctx.beginPath();
-        ctx.fillStyle = (x === state.w && y === state.h) ? "#555" : fillStyle;
+        ctx.strokeStyle = (x === state.w && y === state.h) ? "#555" : fillStyle;
         ctx.ellipse(x*unitSize,y*unitSize,r,r,0,0,Math.PI*2);
-        ctx.fill();
+        ctx.stroke();
       }
     }
   }
@@ -45,15 +46,15 @@ function drawCoprimes(fillStyle) {
 
 function drawBox() {
   ctx.strokeStyle = "#555";
-  ctx.fillStyle = "rgba(40,70,100,0.2)";
+  ctx.fillStyle = "rgba(40,70,100,0.3)";
   const w = state.w * unitSize;
   const h = state.h * unitSize;
   ctx.fillRect(0, 0, w, h);
   ctx.strokeRect(0, 0, w, h);
 
-  const relUnit = gcd(state.w, state.h);
-  if (relUnit !== 1) {
-    drawGrid(canvas.width, canvas.height, relUnit*unitSize, "rgba(40,70,100,0.3)");
+  const scale = gcd(state.w, state.h);
+  if (scale !== 1) {
+    drawGrid(canvas.width, canvas.height, scale*unitSize, "rgba(40,70,100,0.3)");
   }
 
   const pad = unitSize/2;
@@ -69,8 +70,8 @@ function drawBox() {
 
 function draw() {
   ctx.clearRect(0,0,canvas.width, canvas.height);
-  drawGrid(canvas.width, canvas.height, unitSize, "#f5f5f5");
-  drawCoprimes("#f5f5f5");
+  drawGrid(canvas.width, canvas.height, unitSize, "rgba(0,0,0,0.05)");
+  drawNonCoprimes("rgba(0,0,0,0.1");
   drawBox();
 }
 
@@ -83,20 +84,17 @@ function resizeCanvas() {
 resizeCanvas();
 document.body.onresize = resizeCanvas;
 
-function onMouseUpdate(e, mousedown) {
-  if (mousedown) {
-    state.w = Math.round(e.offsetX / unitSize);
-    state.h = Math.round(e.offsetY / unitSize);
-    draw();
-  }
+function resizeBoxToMouse(e) {
+  state.w = Math.round(e.offsetX / unitSize);
+  state.h = Math.round(e.offsetY / unitSize);
+  draw();
 }
 
 function createMouseEvents() {
-  let mousedown = false;
-  const update = (e) => onMouseUpdate(e, mousedown);
-  canvas.onmousemove = update;
-  canvas.onmousedown = (e) => { mousedown = true; update(e) };
-  canvas.onmouseup = (e) => { mousedown = false; update(e) };
+  let down = false;
+  canvas.onmousemove = (e) => { if (down) resizeBoxToMouse(e); };
+  canvas.onmousedown = (e) => { down = true; resizeBoxToMouse(e); };
+  canvas.onmouseup = (e) => { down = false; };
 }
 
 createMouseEvents();
