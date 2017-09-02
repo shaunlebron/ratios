@@ -3,6 +3,7 @@ const canvas = document.querySelector('canvas');
 const ctx = canvas.getContext('2d');
 
 const unitSize = 20;
+const visit = {};
 
 function gcd(n0, n1) {
   const a = Math.max(n0, n1);
@@ -46,18 +47,20 @@ function drawNonCoprimes(fillStyle) {
 
 function drawBox() {
   const scale = gcd(state.w, state.h);
+  let opacity = scale === 1 ? 0.08 : 0.2;
+
+  drawGrid(canvas.width, canvas.height, unitSize, "rgba(40,70,100,0.08)");
+  if (scale !== 1) {
+    drawGrid(canvas.width, canvas.height, scale*unitSize, `rgba(40,70,100,0.2)`);
+  }
 
   ctx.strokeStyle = "#555";
-  const opacity = scale === 1 ? 0.15 : 0.3;
+  opacity = scale === 1 ? 0.15 : 0.3;
   ctx.fillStyle = `rgba(40,70,100,${opacity})`;
   const w = state.w * unitSize;
   const h = state.h * unitSize;
   ctx.fillRect(0, 0, w, h);
   ctx.strokeRect(0, 0, w, h);
-
-  if (scale !== 1) {
-    drawGrid(canvas.width, canvas.height, scale*unitSize, "rgba(40,70,100,0.3)");
-  }
 
   const pad = unitSize/2;
   ctx.fillStyle = "#555";
@@ -72,7 +75,6 @@ function drawBox() {
 
 function draw() {
   ctx.clearRect(0,0,canvas.width, canvas.height);
-  drawGrid(canvas.width, canvas.height, unitSize, "rgba(0,0,0,0.05)");
   drawNonCoprimes("rgba(0,0,0,0.1");
   drawBox();
 }
@@ -87,8 +89,11 @@ resizeCanvas();
 document.body.onresize = resizeCanvas;
 
 function resizeBoxToMouse(e) {
-  state.w = Math.round(e.offsetX / unitSize);
-  state.h = Math.round(e.offsetY / unitSize);
+  var x = Math.max(1, Math.round(e.offsetX / unitSize));
+  var y = Math.max(1, Math.round(e.offsetY / unitSize));
+  visit[`${x},${y}`] = true;
+  state.w = x;
+  state.h = y;
   draw();
 }
 
