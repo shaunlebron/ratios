@@ -31,11 +31,11 @@ function drawGrid(w, h, unit, strokeStyle) {
 
 function drawCoprimes(fillStyle) {
   const r = unitSize / 4;
-  ctx.fillStyle = fillStyle;
   for (let x=0; x<=canvas.width/unitSize; x++) {
     for (let y=0; y<=canvas.height/unitSize; y++) {
       if (x !== y && gcd(x,y) !== 1) {
         ctx.beginPath();
+        ctx.fillStyle = (x === state.w && y === state.h) ? "#555" : fillStyle;
         ctx.ellipse(x*unitSize,y*unitSize,r,r,0,0,Math.PI*2);
         ctx.fill();
       }
