@@ -48,15 +48,27 @@ function drawGrid(w, h, unit, strokeStyle) {
   ctx.stroke();
 }
 
+function drawTileSizeIndicator(x,y,size) {
+  const r = size;
+  ctx.save();
+  ctx.translate(x,y);
+  // ctx.rotate(Math.PI/2);
+  ctx.beginPath();
+  ctx.moveTo(0,-r);
+  ctx.lineTo(-r,0);
+  ctx.lineTo(0,r);
+  ctx.lineTo(r,0);
+  ctx.closePath();
+  ctx.restore();
+}
+
 function drawNonCoprimes(fillStyle) {
   for (let x=1; x<=virtualW/unitSize; x++) {
     for (let y=1; y<=virtualH/unitSize; y++) {
       const scale = gcd(x,y);
       if (scale !== 1) {
-        const r = scale;
-        ctx.beginPath();
+        drawTileSizeIndicator(x*unitSize,y*unitSize,scale);
         ctx.strokeStyle = (x === state.w && y === state.h) ? "#555" : fillStyle;
-        ctx.ellipse(x*unitSize,y*unitSize,r,r,0,0,Math.PI*2);
         ctx.stroke();
       }
     }
@@ -150,7 +162,7 @@ function drawBox() {
 
 function draw() {
   ctx.clearRect(0,0,virtualW,virtualH);
-  drawNonCoprimes("rgba(0,0,0,0.1");
+  drawNonCoprimes("rgba(0,0,0,0.05");
   drawBox();
 }
 
