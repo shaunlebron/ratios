@@ -1,8 +1,18 @@
+'use strict';
+
+const state = {
+  w: 30, // box width
+  h: 20, // box height
+};
+
+const unitSize = 20; // pixel size of single unit
+
+//----------------------------------------------------------------------
+// Canvas
+//----------------------------------------------------------------------
 
 const canvas = document.querySelector('canvas');
 const ctx = canvas.getContext('2d');
-
-const unitSize = 20;
 
 let virtualW = 0;
 let virtualH = 0;
@@ -17,22 +27,24 @@ function resizeCanvas() {
   pixelH = virtualH * ratio;
   canvas.width = pixelW;
   canvas.height = pixelH;
-  canvas.style.width = virtualW + "px";
-  canvas.style.height = virtualH + "px";
+  canvas.style.width = virtualW + 'px';
+  canvas.style.height = virtualH + 'px';
   ctx.scale(ratio, ratio);
   draw();
 }
+resizeCanvas();
+document.body.onresize = resizeCanvas;
+
+//----------------------------------------------------------------------
+// Draw
+//----------------------------------------------------------------------
 
 function gcd(n0, n1) {
+  // greatest common divisor (via euclidean algorithm)
   const a = Math.max(n0, n1);
   const b = Math.min(n0, n1);
   return (b === 0) ? a : gcd(b, a % b);
 }
-
-const state = {
-  w: 30,
-  h: 20,
-};
 
 function drawGrid(w, h, unit, strokeStyle) {
   ctx.beginPath();
@@ -68,54 +80,56 @@ function drawNonCoprimes(fillStyle) {
       const scale = gcd(x,y);
       if (scale !== 1) {
         drawTileSizeIndicator(x*unitSize,y*unitSize,scale);
-        ctx.strokeStyle = (x === state.w && y === state.h) ? "#555" : fillStyle;
+        ctx.strokeStyle = (x === state.w && y === state.h) ? '#555' : 'rgba(0,0,0,0.05)';
         ctx.stroke();
       }
     }
   }
 }
 
-function drawBox() {
+function drawGrids() {
   const w = state.w * unitSize;
   const h = state.h * unitSize;
-
   const scale = gcd(state.w, state.h);
-
-  drawGrid(virtualW, virtualH, unitSize, "rgba(40,70,100,0.08)");
+  drawGrid(virtualW, virtualH, unitSize, 'rgba(40,70,100,0.08)');
   if (scale !== 1) {
     drawGrid(virtualW, virtualH, scale*unitSize, `rgba(40,70,100,0.2)`);
     drawGrid(w, h, scale*unitSize, `rgba(40,70,100,0.4)`);
   }
+}
 
-  ctx.strokeStyle = "#555";
-  const opacity = scale === 1 ? 0.15 : 0.3;
-  ctx.fillStyle = `rgba(40,70,100,${opacity})`;
-  ctx.fillRect(0, 0, w, h);
-  ctx.strokeRect(0, 0, w, h);
+function drawBoxLabels() {
+  const w = state.w * unitSize;
+  const h = state.h * unitSize;
+  const scale = gcd(state.w, state.h);
 
   const pad = unitSize/2;
   const fontSize = 20;
   ctx.font = `${fontSize}px Helvetica`;
-  const activeFill = "#555";
-  const inactiveFill = "rgb(130, 140, 160)";
+  const activeFill = '#555';
+  const inactiveFill = 'rgb(130, 140, 160)';
 
+  // show height
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   ctx.fillStyle = activeFill;
   ctx.fillText(state.h, w + pad, h/2);
 
+  // show width
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
   ctx.fillStyle = activeFill;
   ctx.fillText(state.w, w/2, h + pad + fontSize/2);
 
+  // show tile info
   if (scale !== 1) {
-    let x,y,text;
+    let x,y,text,tiles;
     const widthLabelPad = ctx.measureText(state.w).width;
     const heightLabelPad = ctx.measureText(state.h).width;
     const smallFontSize = 16;
     ctx.font = `${smallFontSize}px Helvetica`;
 
+    // show height in terms of tiles
     if (state.h <= 10) {
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'left';
@@ -132,6 +146,7 @@ function drawBox() {
     ctx.fillStyle = inactiveFill;
     ctx.fillText(text, x, y);
 
+    // show width in terms of tiles
     if (state.w <= 10) {
       ctx.textBaseline = 'top';
       ctx.textAlign = state.w <= 4 ? 'left' : 'center';
@@ -148,6 +163,7 @@ function drawBox() {
     text = `(${tiles} tile${tiles>1?'s':''} wide)`;
     ctx.fillText(text, x, y);
 
+    // show tile size
     ctx.textBaseline = 'bottom';
     ctx.textAlign = 'right';
     ctx.fillStyle = '#fff';
@@ -160,14 +176,30 @@ function drawBox() {
   }
 }
 
+function drawBox() {
+  const w = state.w * unitSize;
+  const h = state.h * unitSize;
+  const scale = gcd(state.w, state.h);
+
+  ctx.strokeStyle = '#555';
+  const opacity = scale === 1 ? 0.15 : 0.3;
+  ctx.fillStyle = `rgba(40,70,100,${opacity})`;
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeRect(0, 0, w, h);
+
+  drawBoxLabels();
+}
+
 function draw() {
   ctx.clearRect(0,0,virtualW,virtualH);
-  drawNonCoprimes("rgba(0,0,0,0.05");
+  drawNonCoprimes();
+  drawGrids();
   drawBox();
 }
 
-resizeCanvas();
-document.body.onresize = resizeCanvas;
+//----------------------------------------------------------------------
+// Mouse
+//----------------------------------------------------------------------
 
 function resizeBoxToMouse(e, resizeW, resizeH) {
   if (resizeW) { state.w = Math.max(1, Math.round(e.offsetX / unitSize)); }
