@@ -30,8 +30,8 @@ function gcd(n0, n1) {
 }
 
 const state = {
-  w: 1,
-  h: 1,
+  w: 30,
+  h: 20,
 };
 
 function drawGrid(w, h, unit, strokeStyle) {
@@ -82,14 +82,49 @@ function drawBox() {
   ctx.strokeRect(0, 0, w, h);
 
   const pad = unitSize/2;
-  ctx.fillStyle = "#555";
-  ctx.font = '20px Helvetica';
+  const fontSize = 20;
+  ctx.font = `${fontSize}px Helvetica`;
+  const activeFill = "#555";
+  const inactiveFill = "rgb(130, 140, 160)";
+
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
+  ctx.fillStyle = activeFill;
   ctx.fillText(state.h, w + pad, h/2);
-  ctx.textBaseline = 'top';
+
+  ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
-  ctx.fillText(state.w, w/2, h + pad);
+  ctx.fillStyle = activeFill;
+  ctx.fillText(state.w, w/2, h + pad + fontSize/2);
+
+  if (scale !== 1) {
+    const widthLabelPad = ctx.measureText(state.w).width;
+    const heightLabelPad = ctx.measureText(state.h).width;
+    const smallFontSize = 16;
+    ctx.font = `${smallFontSize}px Helvetica`;
+
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = inactiveFill;
+    let tiles = state.h/scale;
+    ctx.fillText(`(${tiles} tile${tiles>1?'s':''} high)`, w + pad, h/2 + pad*1.5);
+
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = inactiveFill;
+    tiles = state.w/scale;
+    ctx.fillText(`(${tiles} tile${tiles>1?'s':''} wide)`, w/2 + pad + widthLabelPad/2, h + pad + fontSize/2);
+
+    ctx.textBaseline = 'bottom';
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = activeFill;
+    const x = (state.w - 0.5) * unitSize;
+    const y = (state.h - 0.5) * unitSize;
+    const text = `${scale}x${scale}`;
+    ctx.strokeText(text, x, y);
+    ctx.fillText(text, x, y);
+  }
 }
 
 function draw() {
