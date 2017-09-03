@@ -4,6 +4,25 @@ const ctx = canvas.getContext('2d');
 
 const unitSize = 20;
 
+let virtualW = 0;
+let virtualH = 0;
+let pixelW = 0;
+let pixelH = 0;
+
+function resizeCanvas() {
+  const ratio = window.devicePixelRatio || 1;
+  virtualW = window.innerWidth;
+  virtualH = window.innerHeight;
+  pixelW = virtualW * ratio;
+  pixelH = virtualH * ratio;
+  canvas.width = pixelW;
+  canvas.height = pixelH;
+  canvas.style.width = virtualW + "px";
+  canvas.style.height = virtualH + "px";
+  ctx.scale(ratio, ratio);
+  draw();
+}
+
 function gcd(n0, n1) {
   const a = Math.max(n0, n1);
   const b = Math.min(n0, n1);
@@ -30,8 +49,8 @@ function drawGrid(w, h, unit, strokeStyle) {
 }
 
 function drawNonCoprimes(fillStyle) {
-  for (let x=1; x<=canvas.width/unitSize; x++) {
-    for (let y=1; y<=canvas.height/unitSize; y++) {
+  for (let x=1; x<=virtualW/unitSize; x++) {
+    for (let y=1; y<=virtualH/unitSize; y++) {
       const scale = gcd(x,y);
       if (scale !== 1) {
         const r = scale;
@@ -50,9 +69,9 @@ function drawBox() {
 
   const scale = gcd(state.w, state.h);
 
-  drawGrid(canvas.width, canvas.height, unitSize, "rgba(40,70,100,0.08)");
+  drawGrid(virtualW, virtualH, unitSize, "rgba(40,70,100,0.08)");
   if (scale !== 1) {
-    drawGrid(canvas.width, canvas.height, scale*unitSize, `rgba(40,70,100,0.2)`);
+    drawGrid(virtualW, virtualH, scale*unitSize, `rgba(40,70,100,0.2)`);
     drawGrid(w, h, scale*unitSize, `rgba(40,70,100,0.4)`);
   }
 
@@ -74,15 +93,9 @@ function drawBox() {
 }
 
 function draw() {
-  ctx.clearRect(0,0,canvas.width, canvas.height);
+  ctx.clearRect(0,0,virtualW,virtualH);
   drawNonCoprimes("rgba(0,0,0,0.1");
   drawBox();
-}
-
-function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  draw();
 }
 
 resizeCanvas();
