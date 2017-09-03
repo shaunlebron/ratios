@@ -6,6 +6,7 @@ const state = {
   animate: true,
   animating: false,
   filledTiles: [],
+  backfilledTiles: [],
   spaceLeft: null,
 };
 
@@ -53,6 +54,10 @@ function gcd(x,y) {
   return (b === 0) ? a : gcd(b, a % b);
 }
 
+//----------------------------------------------------------------------
+// Animation
+//----------------------------------------------------------------------
+
 function nextSpace({x,y,w,h}) {
   let s = Math.min(w,h);
   if (w > h) { x += s; w -= s; }
@@ -60,8 +65,10 @@ function nextSpace({x,y,w,h}) {
   return {x,y,w,h};
 }
 
-async function animateTiles(width,height) {
-  await delay(400);
+async function backfillTiles() {
+}
+
+async function fillTiles() {
   while (true) {
     const {x,y,w,h} = state.spaceLeft;
     const s = Math.min(w,h);
@@ -75,8 +82,22 @@ async function animateTiles(width,height) {
       break;
     }
   }
-  await delay(300);
+}
+
+async function animateTiles() {
   state.filledTiles = [];
+  state.spaceLeft = {x:0,y:0,w:state.w,h:state.h};
+
+  if (!state.animating) {
+    state.animating = true;
+    await delay(400);
+    await fillTiles();
+    await backfillTiles();
+    state.animating = false;
+    await delay(300);
+    state.filledTiles = [];
+    draw();
+  }
 }
 
 //----------------------------------------------------------------------
@@ -275,15 +296,7 @@ async function resizeBoxToMouse(e, resizeW, resizeH) {
   if (resizeH) { state.h = Math.max(1, Math.round(e.offsetY / unitSize)); }
 
   if (state.animate) {
-    state.filledTiles = [];
-    state.spaceLeft = {x:0,y:0,w:state.w,h:state.h};
-
-    if (!state.animating) {
-      state.animating = true;
-      draw();
-      await animateTiles(state.w, state.h);
-      state.animating = false;
-    }
+    animateTiles();
   }
   draw();
 }
