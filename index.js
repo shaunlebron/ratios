@@ -3,9 +3,17 @@
 const state = {
   w: 30, // box width
   h: 20, // box height
+  animate: true,
+  animating: false,
+  filledTiles: [],
+  spaceLeft: null,
 };
 
 const unitSize = 20; // pixel size of single unit
+
+function delay(ms) {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
 
 //----------------------------------------------------------------------
 // Canvas
@@ -32,18 +40,63 @@ function resizeCanvas() {
   ctx.scale(ratio, ratio);
   draw();
 }
-resizeCanvas();
 document.body.onresize = resizeCanvas;
+
+//----------------------------------------------------------------------
+// Math
+//----------------------------------------------------------------------
+
+// greatest common divisor (via euclidean algorithm)
+function gcd(x,y) {
+  const a = Math.max(x,y);
+  const b = Math.min(x,y);
+  return (b === 0) ? a : gcd(b, a % b);
+}
+
+function nextSpace({x,y,w,h}) {
+  let s = Math.min(w,h);
+  if (w > h) { x += s; w -= s; }
+  else       { y += s; h -= s; }
+  return {x,y,w,h};
+}
+
+async function animateTiles(width,height) {
+  await delay(100);
+  while (true) {
+    const {x,y,w,h} = state.spaceLeft;
+    const s = Math.min(w,h);
+    if (s > 0) {
+      state.filledTiles.push({x,y,s});
+      state.spaceLeft = nextSpace(state.spaceLeft);
+      draw();
+      await delay(s*15);
+    } else {
+      draw();
+      break;
+    }
+  }
+  await delay(300);
+  state.filledTiles = [];
+}
 
 //----------------------------------------------------------------------
 // Draw
 //----------------------------------------------------------------------
 
-function gcd(n0, n1) {
-  // greatest common divisor (via euclidean algorithm)
-  const a = Math.max(n0, n1);
-  const b = Math.min(n0, n1);
-  return (b === 0) ? a : gcd(b, a % b);
+const unitStroke = 'rgba(40,70,100,0.08)';
+const tileStrokeOut = 'rgba(40,70,100,0.2)';
+const tileStrokeIn = 'rgba(40,70,100,0.4)';
+
+const boxFill = 'rgba(40,70,100,0.15)';
+const tileFill = 'rgba(40,70,100,0.15)';
+const boxStroke = '#555';
+
+const fontSize = 20;
+const smallFontSize = 16;
+
+function shouldShowTiles() {
+  const scale = gcd(state.w, state.h);
+  return scale !== 1 && !state.animating;
 }
 
 function drawGrid(w, h, unit, strokeStyle) {
@@ -87,15 +140,20 @@ function drawNonCoprimes(fillStyle) {
   }
 }
 
-function drawGrids() {
-  const w = state.w * unitSize;
-  const h = state.h * unitSize;
-  const scale = gcd(state.w, state.h);
-  drawGrid(virtualW, virtualH, unitSize, 'rgba(40,70,100,0.08)');
-  if (scale !== 1) {
-    drawGrid(virtualW, virtualH, scale*unitSize, `rgba(40,70,100,0.2)`);
-    drawGrid(w, h, scale*unitSize, `rgba(40,70,100,0.4)`);
+function drawTileLabel(x,y,s) {
+  if (s === 1) {
+    return;
   }
+  ctx.font = `${smallFontSize}px Helvetica`;
+  ctx.textBaseline = 'bottom';
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#fff';
+  ctx.strokeStyle = boxStroke;
+  const tx = (x+s - 0.3) * unitSize;
+  const ty = (y+s - 0.3) * unitSize;
+  const text = `${s}x${s}`;
+  ctx.strokeText(text, tx, ty);
+  ctx.fillText(text, tx, ty);
 }
 
 function drawBoxLabels() {
@@ -104,7 +162,6 @@ function drawBoxLabels() {
   const scale = gcd(state.w, state.h);
 
   const pad = unitSize/2;
-  const fontSize = 20;
   ctx.font = `${fontSize}px Helvetica`;
   const activeFill = '#555';
   const inactiveFill = 'rgb(130, 140, 160)';
@@ -122,11 +179,10 @@ function drawBoxLabels() {
   ctx.fillText(state.w, w/2, h + pad + fontSize/2);
 
   // show tile info
-  if (scale !== 1) {
+  if (shouldShowTiles()) {
     let x,y,text,tiles;
     const widthLabelPad = ctx.measureText(state.w).width;
     const heightLabelPad = ctx.measureText(state.h).width;
-    const smallFontSize = 16;
     ctx.font = `${smallFontSize}px Helvetica`;
 
     // show height in terms of tiles
@@ -163,16 +219,7 @@ function drawBoxLabels() {
     text = `(${tiles} tile${tiles>1?'s':''} wide)`;
     ctx.fillText(text, x, y);
 
-    // show tile size
-    ctx.textBaseline = 'bottom';
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#fff';
-    ctx.strokeStyle = activeFill;
-    x = (state.w - 0.5) * unitSize;
-    y = (state.h - 0.5) * unitSize;
-    text = `${scale}x${scale}`;
-    ctx.strokeText(text, x, y);
-    ctx.fillText(text, x, y);
+    drawTileLabel(state.w - scale, state.h - scale, scale);
   }
 }
 
@@ -181,29 +228,62 @@ function drawBox() {
   const h = state.h * unitSize;
   const scale = gcd(state.w, state.h);
 
-  ctx.strokeStyle = '#555';
-  const opacity = scale === 1 ? 0.15 : 0.3;
-  ctx.fillStyle = `rgba(40,70,100,${opacity})`;
+  ctx.strokeStyle = boxStroke;
+  ctx.fillStyle = boxFill;
   ctx.fillRect(0, 0, w, h);
   ctx.strokeRect(0, 0, w, h);
+}
 
-  drawBoxLabels();
+function drawTileAnimation() {
+  if (shouldShowTiles()) {
+    const w = state.w * unitSize;
+    const h = state.h * unitSize;
+    const scale = gcd(state.w, state.h);
+    drawGrid(virtualW, virtualH, scale*unitSize, tileStrokeOut);
+    drawGrid(w, h, scale*unitSize, tileStrokeIn);
+    ctx.fillStyle = tileFill;
+    ctx.strokeStyle = tileStrokeIn;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeRect(0, 0, w, h);
+  }
+  else {
+    for (let {x,y,s} of state.filledTiles) {
+      ctx.fillStyle = tileFill;
+      ctx.strokeStyle = tileStrokeIn;
+      ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+      ctx.strokeRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+      drawTileLabel(x,y,s);
+    }
+  }
 }
 
 function draw() {
   ctx.clearRect(0,0,virtualW,virtualH);
+  drawGrid(virtualW, virtualH, unitSize, unitStroke);
   drawNonCoprimes();
-  drawGrids();
   drawBox();
+  drawTileAnimation();
+  drawBoxLabels();
 }
 
 //----------------------------------------------------------------------
 // Mouse
 //----------------------------------------------------------------------
 
-function resizeBoxToMouse(e, resizeW, resizeH) {
+async function resizeBoxToMouse(e, resizeW, resizeH) {
   if (resizeW) { state.w = Math.max(1, Math.round(e.offsetX / unitSize)); }
   if (resizeH) { state.h = Math.max(1, Math.round(e.offsetY / unitSize)); }
+
+  if (state.animate) {
+    state.filledTiles = [];
+    state.spaceLeft = {x:0,y:0,w:state.w,h:state.h};
+
+    if (!state.animating) {
+      state.animating = true;
+      await animateTiles(state.w, state.h);
+      state.animating = false;
+    }
+  }
   draw();
 }
 
@@ -261,4 +341,9 @@ function createMouseEvents() {
   };
 }
 
+//----------------------------------------------------------------------
+// Load
+//----------------------------------------------------------------------
+
+resizeCanvas();
 createMouseEvents();
