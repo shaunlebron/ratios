@@ -3,7 +3,6 @@ const canvas = document.querySelector('canvas');
 const ctx = canvas.getContext('2d');
 
 const unitSize = 20;
-const visit = {};
 
 function gcd(n0, n1) {
   const a = Math.max(n0, n1);
@@ -89,20 +88,64 @@ function resizeCanvas() {
 resizeCanvas();
 document.body.onresize = resizeCanvas;
 
-function resizeBoxToMouse(e) {
-  var x = Math.max(1, Math.round(e.offsetX / unitSize));
-  var y = Math.max(1, Math.round(e.offsetY / unitSize));
-  visit[`${x},${y}`] = true;
-  state.w = x;
-  state.h = y;
+function resizeBoxToMouse(e, resizeW, resizeH) {
+  if (resizeW) { state.w = Math.max(1, Math.round(e.offsetX / unitSize)); }
+  if (resizeH) { state.h = Math.max(1, Math.round(e.offsetY / unitSize)); }
   draw();
 }
 
+function canResizeWidth(e) {
+  const x = e.offsetX/unitSize;
+  const y = e.offsetY/unitSize;
+  return Math.abs(x-state.w) < 0.5 && y < state.h + 0.5;
+}
+
+function canResizeHeight(e) {
+  const x = e.offsetX/unitSize;
+  const y = e.offsetY/unitSize;
+  return Math.abs(y-state.h) < 0.5 && x < state.w + 0.5;
+}
+
+function getCursor(e) {
+  const resizeW = canResizeWidth(e);
+  const resizeH = canResizeHeight(e);
+  let cursor;
+  if (resizeW && resizeH) { cursor = 'nwse-resize'; }
+  else if (resizeW)       { cursor = 'ew-resize'; }
+  else if (resizeH)       { cursor = 'ns-resize'; }
+  else                    { cursor = 'default'; }
+  return cursor;
+}
+
+function updateCursor(e) {
+  document.body.style.cursor = getCursor(e);
+}
+
 function createMouseEvents() {
-  let down = false;
-  canvas.onmousemove = (e) => { if (down) resizeBoxToMouse(e); };
-  canvas.onmousedown = (e) => { down = true; resizeBoxToMouse(e); };
-  canvas.onmouseup = (e) => { down = false; };
+  let resizeW = false;
+  let resizeH = false;
+  canvas.onmousedown = (e) => {
+    updateCursor(e);
+    resizeW = canResizeWidth(e);
+    resizeH = canResizeHeight(e);
+    if (!resizeW && !resizeH) {
+      resizeW = true;
+      resizeH = true;
+    }
+    resizeBoxToMouse(e, resizeW, resizeH);
+  };
+  canvas.onmousemove = (e) => {
+    if (resizeH || resizeW) {
+      resizeBoxToMouse(e, resizeW, resizeH);
+    } else {
+      updateCursor(e);
+    }
+  };
+  canvas.onmouseup = (e) => {
+    resizeW = false;
+    resizeH = false;
+    updateCursor(e);
+  };
 }
 
 createMouseEvents();
