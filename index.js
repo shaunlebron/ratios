@@ -98,30 +98,51 @@ function drawBox() {
   ctx.fillText(state.w, w/2, h + pad + fontSize/2);
 
   if (scale !== 1) {
+    let x,y,text;
     const widthLabelPad = ctx.measureText(state.w).width;
     const heightLabelPad = ctx.measureText(state.h).width;
     const smallFontSize = 16;
     ctx.font = `${smallFontSize}px Helvetica`;
 
-    ctx.textBaseline = 'top';
-    ctx.textAlign = 'left';
+    if (state.h <= 10) {
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      x = w + 2*pad + heightLabelPad;
+      y = h/2;
+    } else {
+      ctx.textBaseline = 'top';
+      ctx.textAlign = 'left';
+      x = w + pad;
+      y = h/2 + pad*1.5;
+    }
+    tiles = state.h/scale;
+    text = `(${tiles} tile${tiles>1?'s':''} high)`;
     ctx.fillStyle = inactiveFill;
-    let tiles = state.h/scale;
-    ctx.fillText(`(${tiles} tile${tiles>1?'s':''} high)`, w + pad, h/2 + pad*1.5);
+    ctx.fillText(text, x, y);
 
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'left';
+    if (state.w <= 10) {
+      ctx.textBaseline = 'top';
+      ctx.textAlign = state.w <= 4 ? 'left' : 'center';
+      x = w/2;
+      y = h + pad + fontSize;
+    } else {
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      x = w/2 + pad + widthLabelPad/2;
+      y = h + pad + fontSize/2;
+    }
     ctx.fillStyle = inactiveFill;
     tiles = state.w/scale;
-    ctx.fillText(`(${tiles} tile${tiles>1?'s':''} wide)`, w/2 + pad + widthLabelPad/2, h + pad + fontSize/2);
+    text = `(${tiles} tile${tiles>1?'s':''} wide)`;
+    ctx.fillText(text, x, y);
 
     ctx.textBaseline = 'bottom';
     ctx.textAlign = 'right';
     ctx.fillStyle = '#fff';
     ctx.strokeStyle = activeFill;
-    const x = (state.w - 0.5) * unitSize;
-    const y = (state.h - 0.5) * unitSize;
-    const text = `${scale}x${scale}`;
+    x = (state.w - 0.5) * unitSize;
+    y = (state.h - 0.5) * unitSize;
+    text = `${scale}x${scale}`;
     ctx.strokeText(text, x, y);
     ctx.fillText(text, x, y);
   }
