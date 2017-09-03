@@ -61,7 +61,7 @@ function nextSpace({x,y,w,h}) {
 }
 
 async function animateTiles(width,height) {
-  await delay(100);
+  await delay(400);
   while (true) {
     const {x,y,w,h} = state.spaceLeft;
     const s = Math.min(w,h);
@@ -280,6 +280,7 @@ async function resizeBoxToMouse(e, resizeW, resizeH) {
 
     if (!state.animating) {
       state.animating = true;
+      draw();
       await animateTiles(state.w, state.h);
       state.animating = false;
     }
