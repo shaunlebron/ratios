@@ -98,16 +98,23 @@ function gcd(x,y) {
 // Time can be distributed linearly based on distance traveled during animation,
 // or just equal time for each tile.
 
-function cutSpace({x,y,w,h}) {
+function cutSpace({x,y,w,h,lastFillDir}) {
   // Given a `spaceLeft` to fill, we cut out biggest possible square from it and
   // return both parts.
   const spaceLeft = {x,y,w,h};
   const tile = {x,y};
   tile.s = Math.min(w,h)
   tile.rowsFilled = 0;
-  if (w > h) { spaceLeft.x += tile.s; spaceLeft.w -= tile.s; tile.fillDir = 'x'; }
-  else       { spaceLeft.y += tile.s; spaceLeft.h -= tile.s; tile.fillDir = 'y'; }
-  tile.isLast = Math.min(spaceLeft.w, spaceLeft.h) === 0;
+  if (w > h)      { spaceLeft.x += tile.s; spaceLeft.w -= tile.s; tile.fillDir = 'x'; }
+  else if (w < h) { spaceLeft.y += tile.s; spaceLeft.h -= tile.s; tile.fillDir = 'y'; }
+  else         {
+    spaceLeft.x += tile.s;
+    spaceLeft.y += tile.s;
+    spaceLeft.w = spaceLeft.h = 0;
+    tile.fillDir = lastFillDir || 'x';
+    tile.isLast = true;
+  }
+  spaceLeft.lastFillDir = tile.fillDir;
   return {tile, spaceLeft};
 }
 
