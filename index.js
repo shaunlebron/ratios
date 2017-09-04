@@ -56,6 +56,32 @@ function gcd(x,y) {
 // Animation
 //----------------------------------------------------------------------
 
+// New plan is to make animation easier and as a side benefit make it scrubbable
+// so the user can focus on parts they are interested in to learn it better.
+
+// We must first create a list of tiles, easy enough.
+// Then we need a draw function that draws all tiles at a given time.
+
+// Timeline:
+//           1s?              400ms              1s?
+// |----------------------|-----------|------------------------|
+// |                      |           |                        |
+// | Fill tiles           | Highlight | Backfill large tiles   |
+// |                      | last tile |                        |
+// |                      |           |                        |
+// |----------------------|-----------|------------------------|
+
+// Each tile has its own time markers so it can draw itself at any given time:
+// - fillStart
+// - fillEnd
+// - highlightStart
+// - highlightEnd
+// - backfillStart
+// - backfillEnd
+
+// Time can be distributed linearly based on distance traveled during animation,
+// or just equal time for each tile.
+
 function tileBackfilled(tile) {
   // During animation, there is a backfilling phase.
   // Existing tiles that are not the size of the final determined `scale` size
