@@ -6,7 +6,8 @@ const state = {
   scale: null, // box tile size
   tiles: [], // tiles {x,y,s} added during animation
   animate: {
-    enabled: false,
+    scrubbing: false,
+    enabled: true,
     t: null,
     total: null,
     phases: [],
@@ -120,14 +121,15 @@ function* allTiles(w,h) {
 }
 
 function addAnimToTiles(tiles) {
-  const total = tiles.reduce((sum, {s}) => sum+s, 0);
+  const pause = 2;
+  const total = tiles.reduce((sum, {s}) => sum+s+pause, 0);
   // const total = tiles.length;
   let i = 0;
   for (let tile of tiles) {
     tile.fillStart = i/total;
-    i += tile.s;
+    i += tile.s+pause;
     // i++;
-    tile.fillEnd = i/total
+    tile.fillEnd = i/total;
     tile.fillLength = tile.fillEnd - tile.fillStart;
   }
   const scale = tiles[tiles.length-1].s;
@@ -372,6 +374,13 @@ function drawTileHighlight(tile, time) {
     ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
     ctx.fillStyle = (s === 1) ? failureFill : successFill;
     ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+    drawTileLabel(x,y,s);
+  } else {
+    ctx.fillStyle = tileFill;
+    ctx.strokeStyle = tileStrokeIn;
+    ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+    ctx.strokeRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+    drawTileLabel(x,y,s);
   }
 }
 
@@ -387,7 +396,7 @@ function drawTileBackfill(tile, time) {
     ctx.fillStyle = tileFill;
     ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
   }
-  else if (time < backfillStart) {
+  else if (time > backfillStart) {
     const t = Math.min(1, (time - backfillStart) / backfillLength);
     const numTiles = s / scale;
     const rowProgress = t * numTiles;
@@ -483,7 +492,7 @@ function tick(t) {
     dt = 0;
   }
   lastTime = t;
-  if (isAnimating()) {
+  if (isAnimating() && !state.animate.scrubbing) {
     advanceAnim(dt);
   }
   window.requestAnimationFrame(tick);
@@ -518,20 +527,34 @@ function getCursor(e) {
   const resizeW = canResizeWidth(e);
   const resizeH = canResizeHeight(e);
   let cursor;
-  if (resizeW && resizeH) { cursor = 'nwse-resize'; }
-  else if (resizeW)       { cursor = 'ew-resize'; }
-  else if (resizeH)       { cursor = 'ns-resize'; }
-  else                    { cursor = 'default'; }
+  if (state.animate.scrubbing) { cursor = '-webkit-grabbing'; }
+  else if (resizeW && resizeH) { cursor = 'nwse-resize'; }
+  else if (resizeW)            { cursor = 'ew-resize'; }
+  else if (resizeH)            { cursor = 'ns-resize'; }
+  else                         { cursor = 'default'; }
   return cursor;
 }
 
 function updateCursor(e) {
-  document.body.style.cursor = getCursor(e);
+  const cursor = getCursor(e);
+  document.body.style.cursor = cursor;
 }
 
 function createMouseEvents() {
   let resizeW = false;
   let resizeH = false;
+  document.body.onkeydown = (e) => {
+    if (e.key === 'Shift') {
+      state.animate.scrubbing = true;
+      updateCursor(e);
+    }
+  };
+  document.body.onkeyup = (e) => {
+    if (e.key === 'Shift') {
+      state.animate.scrubbing = false;
+      updateCursor(e);
+    }
+  };
   canvas.onmousedown = (e) => {
     if (e.button !== 0) {
       return;
@@ -546,7 +569,10 @@ function createMouseEvents() {
     resizeBoxToMouse(e, resizeW, resizeH);
   };
   canvas.onmousemove = (e) => {
-    if (resizeH || resizeW) {
+    if (state.animate.scrubbing) {
+      state.animate.t = state.animate.total * e.offsetX / window.innerWidth;
+      draw();
+    } else if (resizeH || resizeW) {
       resizeBoxToMouse(e, resizeW, resizeH);
     } else {
       updateCursor(e);
@@ -566,7 +592,7 @@ function createMouseEvents() {
 // Load
 //----------------------------------------------------------------------
 
-updateSize(30,20);
+updateSize(35,20);
 resizeCanvas();
 createMouseEvents();
 window.requestAnimationFrame(tick);
