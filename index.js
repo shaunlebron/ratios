@@ -6,23 +6,29 @@ const state = {
   scale: null, // box tile size
   tiles: [], // tiles {x,y,s} added during animation
   animate: {
-    enabled: true,
+    enabled: false,
     t: null,
     total: null,
+    phases: [],
   },
 };
 
 const animPhases = [
-  {name: 'fill', total: 1000},
-  {name: 'highlight', total: 400},
-  {name: 'backfill', total: 1000},
+  {name:'fill', time: 1000},
+  {name:'highlight', time: 400},
+  {name:'backfill', time: 1000},
 ];
+const animPhaseNames = {};
+for (let phase of Object.values(animPhases)) {
+  animPhaseNames[phase.name] = phase;
+}
 
 function updateSize(w,h) {
   state.w = w;
   state.h = h;
   state.scale = gcd(w,h);
   state.tiles = createTiles(w,h);
+  initAnim();
   draw();
 }
 
@@ -161,10 +167,6 @@ const failureFill = 'rgba(255,0,0,0.4)';
 
 const fontSize = 20;
 const smallFontSize = 16;
-
-function isAnimating() {
-  return state.animate.t !== null;
-}
 
 // determines if we should draw static tiles
 // (not during animation and only when tiles are large enough)
@@ -326,8 +328,8 @@ function drawTiles() {
     ctx.strokeStyle = tileStrokeIn;
     ctx.fillRect(0, 0, pixelW, pixelH);
     ctx.strokeRect(0, 0, pixelW, pixelH);
-  } else {
-    drawAnimation();
+  } else if (isAnimating()) {
+    drawAnimation(state.animate.t);
   }
 }
 
@@ -420,9 +422,47 @@ function drawTileAnimation(tile, phase, time) {
   }
 }
 
-function drawAnimation() {
-  const t = state.t / state.total;
+//----------------------------------------------------------------------
+// Animation Timing
+//----------------------------------------------------------------------
+
+function isAnimating() {
+  const {enabled,t} = state.animate;
+  return enabled && t !== null;
+}
+
+function* allPhases() {
+  for (let phase of animPhases) {
+    if (!phase.skip) {
+      yield phase;
+    }
+  }
+}
+
+function getPhase(t) {
+  const phases = state.animate.phases;
+  let p;
+  for (p of phases) {
+    if (t < p.time) { return { phase: p.name, time: t / p.time }; }
+    t -= p.time;
+  }
+  return { phase: p.name, time: 1 };
+}
+
+function initAnim() {
+  if (!state.animate.enabled) {
+    return;
+  }
+  animPhaseNames.backfill.skip = (state.scale === 1);
+  state.animate.t = 0;
+  state.animate.phases = Array.from(allPhases());
+  state.animate.total = state.animate.phases.reduce((sum, {time}) => sum+time, 0);
+}
+
+function drawAnimation(t) {
+  const {phase, time} = getPhase(t);
   for (let tile of state.tiles) {
+    drawTileAnimation(tile, phase, time);
   }
 }
 
