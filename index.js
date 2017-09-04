@@ -466,6 +466,29 @@ function drawAnimation(t) {
   }
 }
 
+function advanceAnim(dt) {
+  state.animate.t += dt;
+  draw();
+  if (state.animate.t > state.animate.total) {
+    state.animate.t = null;
+  }
+}
+
+let lastTime;
+function tick(t) {
+  let dt;
+  if (lastTime) {
+    dt = t - lastTime;
+  } else {
+    dt = 0;
+  }
+  lastTime = t;
+  if (isAnimating()) {
+    advanceAnim(dt);
+  }
+  window.requestAnimationFrame(tick);
+}
+
 //----------------------------------------------------------------------
 // Mouse
 //----------------------------------------------------------------------
@@ -546,3 +569,4 @@ function createMouseEvents() {
 updateSize(30,20);
 resizeCanvas();
 createMouseEvents();
+window.requestAnimationFrame(tick);
