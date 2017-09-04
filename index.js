@@ -429,6 +429,9 @@ function createMouseEvents() {
   let resizeW = false;
   let resizeH = false;
   canvas.onmousedown = (e) => {
+    if (e.button !== 0) {
+      return;
+    }
     updateCursor(e);
     resizeW = canResizeWidth(e);
     resizeH = canResizeHeight(e);
@@ -446,6 +449,9 @@ function createMouseEvents() {
     }
   };
   canvas.onmouseup = (e) => {
+    if (e.button !== 0) {
+      return;
+    }
     resizeW = false;
     resizeH = false;
     updateCursor(e);
