@@ -1,23 +1,32 @@
 'use strict';
 
 const state = {
-  w: 30, // box width
-  h: 20, // box height
-  scale: gcd(30, 20), // box tile size
-
-  animate: true, // does the user want animations?
-  animating: false, // are we animating?
-  backfilling: false, // are we backfilling tiles (during animation)
+  w: null, // box width
+  h: null, // box height
+  scale: null, // box tile size
   tiles: [], // tiles {x,y,s} added during animation
-  spaceLeft: null, // space remaining to be filled {x,y,w,h} by tiles
+  animate: {
+    enabled: true,
+    t: null,
+    total: null,
+  },
 };
 
-const unitSize = 20; // pixel size of single unit
+const animPhases = [
+  {name: 'fill', total: 1000},
+  {name: 'highlight', total: 400},
+  {name: 'backfill', total: 1000},
+];
 
-// `await delay(100)` to pause inside an async function
-function delay(ms) {
-  return new Promise((resolve) => { setTimeout(resolve, ms); });
+function updateSize(w,h) {
+  state.w = w;
+  state.h = h;
+  state.scale = gcd(w,h);
+  state.tiles = createTiles(w,h);
+  draw();
 }
+
+const unitSize = 20; // pixel size of single unit
 
 //----------------------------------------------------------------------
 // Canvas
@@ -53,7 +62,7 @@ function gcd(x,y) {
 }
 
 //----------------------------------------------------------------------
-// Animation
+// Tile Creation
 //----------------------------------------------------------------------
 
 // New plan is to make animation easier and as a side benefit make it scrubbable
@@ -82,17 +91,6 @@ function gcd(x,y) {
 // Time can be distributed linearly based on distance traveled during animation,
 // or just equal time for each tile.
 
-function tileBackfilled(tile) {
-  // During animation, there is a backfilling phase.
-  // Existing tiles that are not the size of the final determined `scale` size
-  // will be backfilled.
-  // Here we determine if a tile is already filled.
-  return (
-    tile.s === state.scale ||
-    tile.rowsFilled === tile.s / state.scale
-  );
-}
-
 function cutSpace({x,y,w,h}) {
   // Given a `spaceLeft` to fill, we cut out biggest possible square from it and
   // return both parts.
@@ -100,76 +98,50 @@ function cutSpace({x,y,w,h}) {
   const tile = {x,y};
   tile.s = Math.min(w,h)
   tile.rowsFilled = 0;
-  if (w > h) { spaceLeft.x += tile.s; spaceLeft.w -= tile.s; tile.fillDir = 'left'; }
-  else       { spaceLeft.y += tile.s; spaceLeft.h -= tile.s; tile.fillDir = 'up'; }
+  if (w > h) { spaceLeft.x += tile.s; spaceLeft.w -= tile.s; tile.fillDir = 'x'; }
+  else       { spaceLeft.y += tile.s; spaceLeft.h -= tile.s; tile.fillDir = 'y'; }
   tile.isLast = Math.min(spaceLeft.w, spaceLeft.h) === 0;
   return {tile, spaceLeft};
 }
 
-function backfillableTile() {
-  // Returns the first backfillable tile (working backwards from the end).
-  for (let i=state.tiles.length-1; i>=0; i--) {
-    if (!tileBackfilled(state.tiles[i])) {
-      return i;
-    }
+function* allTiles(w,h) {
+  let spaceLeft = {x:0, y:0, w, h};
+  let tile = {};
+  while (!tile.isLast) {
+    ({tile, spaceLeft} = cutSpace(spaceLeft));
+    yield tile;
   }
 }
 
-// TODO: create an array of states so we can scrub
-async function backfillTiles() {
-  while (true) {
-    const tile = state.tiles[backfillableTile()];
-    if (tile) {
-      tile.rowsFilled++;
-      draw();
-      await delay(20);
-    } else {
-      break;
+function addAnimToTiles(tiles) {
+  const total = tiles.reduce((sum, {s}) => sum+s, 0);
+  // const total = tiles.length;
+  let i = 0;
+  for (let tile of tiles) {
+    tile.fillStart = i/total;
+    i += tile.s;
+    // i++;
+    tile.fillEnd = i/total
+    tile.fillLength = tile.fillEnd - tile.fillStart;
+  }
+  const scale = tiles[tiles.length-1].s;
+  i = 0;
+  for (let tile of tiles.slice(0).reverse()) {
+    tile.scale = scale;
+    if (tile.s === scale) {
+      continue;
     }
+    tile.backfillStart = i/total;
+    i += tile.s;
+    tile.backfillEnd = i/total;
+    tile.backfillLength = tile.backfillEnd - tile.backfillStart;
   }
 }
 
-// TODO: create an array of states so we can scrub
-async function fillTiles() {
-  while (true) {
-    const {x,y,w,h} = state.spaceLeft;
-    const s = Math.min(w,h);
-    if (s > 0) {
-      const {tile,spaceLeft} = cutSpace(state.spaceLeft);
-      state.tiles.push(tile);
-      state.spaceLeft = spaceLeft;
-      draw();
-      await delay(s*15);
-    }
-    else {
-      break;
-    }
-  }
-}
-
-async function animateTiles() {
-  state.tiles = [];
-  state.spaceLeft = {x:0,y:0,w:state.w,h:state.h};
-
-  if (!state.animating) {
-    state.animating = true;
-    await delay(400);
-    await fillTiles();
-
-    state.highlightTile = true;
-    draw();
-    await delay(800);
-    state.highlightTile = false;
-
-    if (state.scale !== 1) {
-      state.backfilling = true;
-      await backfillTiles();
-      state.backfilling = false;
-    }
-    state.tiles = [];
-    state.animating = false;
-    draw();
-  }
+function createTiles(w,h) {
+  const tiles = Array.from(allTiles(w,h));
+  addAnimToTiles(tiles);
+  return tiles;
 }
 
 //----------------------------------------------------------------------
@@ -190,31 +162,14 @@ const failureFill = 'rgba(255,0,0,0.4)';
 const fontSize = 20;
 const smallFontSize = 16;
 
+function isAnimating() {
+  return state.animate.t !== null;
+}
+
 // determines if we should draw static tiles
 // (not during animation and only when tiles are large enough)
 function shouldDrawStaticTiles() {
-  const {scale} = state;
-  return scale !== 1 && !state.animating;
-}
-
-// determines if we should draw the `NxN` label inside the given tile
-function shouldDrawTileLabel(tile) {
-  const {s, rowsFilled, isLast} = tile;
-  const {scale, backfilling} = state;
-  if (backfilling) {
-    if (s === scale) {
-      if (isLast) {
-        return true;
-      }
-    } else {
-      if (rowsFilled === 0) {
-        return true;
-      }
-    }
-  }
-  else {
-    return true;
-  }
+  return state.scale !== 1 && !isAnimating();
 }
 
 // draw a simple grid in the given area
@@ -371,32 +326,8 @@ function drawTiles() {
     ctx.strokeStyle = tileStrokeIn;
     ctx.fillRect(0, 0, pixelW, pixelH);
     ctx.strokeRect(0, 0, pixelW, pixelH);
-  }
-  else {
-    for (let tile of state.tiles) {
-      const {x,y,s,isLast} = tile;
-      ctx.fillStyle = isLast && state.highlightTile ? (s === 1 ? failureFill : successFill) : tileFill;
-      ctx.strokeStyle = tileStrokeIn;
-      ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
-      ctx.strokeRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
-
-      // draw rows
-      const {rowsFilled, fillDir} = tile;
-      if (shouldDrawTileLabel(tile)) {
-        drawTileLabel(x,y,s);
-      }
-      if (rowsFilled > 0) {
-        ctx.save();
-        if (fillDir === 'left')    { ctx.translate((x+s)*unitSize, y*unitSize); ctx.rotate(Math.PI/2); }
-        else if (fillDir === 'up') { ctx.translate((x+s)*unitSize, (y+s)*unitSize); ctx.rotate(Math.PI); }
-        for (let row=0; row<rowsFilled; row++) {
-          for (let col=0; col<s/scale; col++) {
-            ctx.strokeRect(col*unitSize*scale, row*unitSize*scale, scale*unitSize, scale*unitSize);
-          }
-        }
-        ctx.restore();
-      }
-    }
+  } else {
+    drawAnimation();
   }
 }
 
@@ -410,18 +341,102 @@ function draw() {
 }
 
 //----------------------------------------------------------------------
+// Draw Animation
+//----------------------------------------------------------------------
+
+function drawTileFill(tile, time) {
+  const {fillStart, fillLength} = tile;
+  if (time < fillStart) {
+    // draw nothing
+  } else {
+    // draw growing tile
+    const t = Math.min(1, (time - fillStart) / fillLength);
+    const {x,y,s} = tile;
+    const w = s * (tile.fillDir === 'x' ? t : 1);
+    const h = s * (tile.fillDir === 'y' ? t : 1);
+    ctx.fillStyle = tileFill;
+    ctx.strokeStyle = tileStrokeIn;
+    ctx.fillRect(x*unitSize, y*unitSize, w*unitSize, h*unitSize);
+    ctx.strokeRect(x*unitSize, y*unitSize, w*unitSize, h*unitSize);
+    if (t === 1) {
+      drawTileLabel(x,y,s);
+    }
+  }
+}
+function drawTileHighlight(tile, time) {
+  const {x,y,s,isLast} = tile;
+  if (isLast) {
+    ctx.fillStyle = tileFill;
+    ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+    ctx.fillStyle = (s === 1) ? failureFill : successFill;
+    ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+  }
+}
+
+function drawTileBackfill(tile, time) {
+  const {x,y,s,scale,fillDir} = tile;
+  const {backfillStart, backfillLength} = tile;
+
+  // draw tile outlines
+  ctx.strokeStyle = tileStrokeIn;
+  ctx.strokeRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+
+  if (backfillStart == null) {
+    ctx.fillStyle = tileFill;
+    ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+  }
+  else if (time < backfillStart) {
+    const t = Math.min(1, (time - backfillStart) / backfillLength);
+    const numTiles = s / scale;
+    const rowProgress = t * numTiles;
+    const rows = Math.ceil(rowProgress * numTiles);
+    const cols = numTiles;
+    const lastRowScale = rowProgress - rows;
+
+    ctx.save();
+    if (fillDir === 'x')      { ctx.translate((x+s)*unitSize, y*unitSize); ctx.rotate(Math.PI/2); }
+    else if (fillDir === 'y') { ctx.translate((x+s)*unitSize, (y+s)*unitSize); ctx.rotate(Math.PI); }
+    ctx.fillStyle = tileFill;
+    ctx.strokeStyle = tileStrokeIn;
+    for (let row=0; row<rows; row++) {
+      const h = unitSize * (row === rows-1 ? lastRowScale : scale);
+      for (let col=0; col<cols; col++) {
+        const x = col*scale*unitSize;
+        const y = row*scale*unitSize;
+        const w = scale*unitSize;
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeRect(x, y, w, h);
+      }
+    }
+    ctx.restore();
+  }
+}
+
+function drawTileAnimation(tile, phase, time) {
+  switch (phase) {
+    case 'fill': drawTileFill(tile, time); break;
+    case 'highlight': drawTileHighlight(tile, time); break;
+    case 'backfill': drawTileBackfill(tile, time); break;
+  }
+}
+
+function drawAnimation() {
+  const t = state.t / state.total;
+  for (let tile of state.tiles) {
+  }
+}
+
+//----------------------------------------------------------------------
 // Mouse
 //----------------------------------------------------------------------
 
 function resizeBoxToMouse(e, resizeW, resizeH) {
-  if (resizeW) { state.w = Math.max(1, Math.round(e.offsetX / unitSize)); }
-  if (resizeH) { state.h = Math.max(1, Math.round(e.offsetY / unitSize)); }
-  state.scale = gcd(state.w, state.h);
-
-  if (state.animate) {
-    animateTiles();
+  let {w,h} = state;
+  if (resizeW) { w = Math.max(1, Math.round(e.offsetX / unitSize)); }
+  if (resizeH) { h = Math.max(1, Math.round(e.offsetY / unitSize)); }
+  if (state.w !== w || state.h !== h) {
+    updateSize(w,h);
   }
-  draw();
 }
 
 function canResizeWidth(e) {
@@ -488,5 +503,6 @@ function createMouseEvents() {
 // Load
 //----------------------------------------------------------------------
 
+updateSize(30,20);
 resizeCanvas();
 createMouseEvents();
