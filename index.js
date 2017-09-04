@@ -409,9 +409,12 @@ function drawTileBackfill(tile, time) {
     const t = Math.min(1, (time - backfillStart) / backfillLength);
     const numTiles = s / scale;
     const rowProgress = t * numTiles;
-    const rows = Math.ceil(rowProgress * numTiles);
+    const rows = Math.ceil(rowProgress);
     const cols = numTiles;
-    const lastRowScale = rowProgress - rows;
+    let lastRowScale = rowProgress % 1;
+    if (lastRowScale === 0) {
+      lastRowScale = 1;
+    }
 
     ctx.save();
     if (fillDir === 'x')      { ctx.translate((x+s)*unitSize, y*unitSize); ctx.rotate(Math.PI/2); }
@@ -419,7 +422,7 @@ function drawTileBackfill(tile, time) {
     ctx.fillStyle = tileFill;
     ctx.strokeStyle = tileStrokeIn;
     for (let row=0; row<rows; row++) {
-      const h = unitSize * (row === rows-1 ? lastRowScale : scale);
+      const h = scale*unitSize*(row === rows-1 ? lastRowScale : 1);
       for (let col=0; col<cols; col++) {
         const x = col*scale*unitSize;
         const y = row*scale*unitSize;
