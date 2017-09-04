@@ -374,6 +374,8 @@ function drawTileHighlight(tile, time) {
     ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
     ctx.fillStyle = (s === 1) ? failureFill : successFill;
     ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+    ctx.strokeStyle = tileStrokeIn;
+    ctx.strokeRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
     drawTileLabel(x,y,s);
   } else {
     ctx.fillStyle = tileFill;
