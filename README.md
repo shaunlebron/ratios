@@ -39,3 +39,10 @@ In the example below, the final square is shown in green, meaning 10 and 24 _can
 <img src="screens/noncoprime.png" width="500">
 
 <img src="screens/noncoprime-end.png" width="500">
+
+## Conclusions
+
+Although the animations are stiff and wonky right now due to limited project
+time, this outline represents an interesting visual method for understanding how
+two numbers are related.  It seems to translate well to an understanding of
+fractions, greatest common divisors, and perhaps others.
