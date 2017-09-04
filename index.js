@@ -3,10 +3,10 @@
 const state = {
   w: 30, // box width
   h: 20, // box height
+  scale: gcd(30, 20),
   animate: true,
   animating: false,
-  filledTiles: [],
-  backfilledTiles: [],
+  tiles: [],
   spaceLeft: null,
 };
 
@@ -23,21 +23,16 @@ function delay(ms) {
 const canvas = document.querySelector('canvas');
 const ctx = canvas.getContext('2d');
 
-let virtualW = 0;
-let virtualH = 0;
-let pixelW = 0;
-let pixelH = 0;
+let canvasW, canvasH;
 
 function resizeCanvas() {
   const ratio = window.devicePixelRatio || 1;
-  virtualW = window.innerWidth;
-  virtualH = window.innerHeight;
-  pixelW = virtualW * ratio;
-  pixelH = virtualH * ratio;
-  canvas.width = pixelW;
-  canvas.height = pixelH;
-  canvas.style.width = virtualW + 'px';
-  canvas.style.height = virtualH + 'px';
+  canvasW = window.innerWidth;
+  canvasH = window.innerHeight;
+  canvas.width = canvasW * ratio;
+  canvas.height = canvasH * ratio;
+  canvas.style.width = `${canvasW}px`;
+  canvas.style.height = `${canvasH}px`;
   ctx.scale(ratio, ratio);
   draw();
 }
@@ -58,14 +53,29 @@ function gcd(x,y) {
 // Animation
 //----------------------------------------------------------------------
 
-function nextSpace({x,y,w,h}) {
-  let s = Math.min(w,h);
-  if (w > h) { x += s; w -= s; }
-  else       { y += s; h -= s; }
-  return {x,y,w,h};
+function tileFilled(tile) {
+  return (
+    tile.s === state.scale ||
+    tile.rowsFilled === tile.s / state.scale
+  );
 }
 
-async function backfillTiles() {
+function cutSpace({x,y,w,h}) {
+  const spaceLeft = {x,y,w,h};
+  const tile = {x,y};
+  tile.s = Math.min(w,h)
+  tile.rowsFilled = 0;
+  if (w > h) { spaceLeft.x += tile.s; spaceLeft.w -= tile.s; tile.fillDir = 'left'; }
+  else       { spaceLeft.y += tile.s; spaceLeft.h -= tile.s; tile.fillDir = 'up'; }
+  return {tile, spaceLeft};
+}
+
+function currentTileIndex() {
+  for (let i=state.tiles.length-1; i>=0; i--) {
+    if (!tileFilled(state.tiles[i])) {
+      return i;
+    }
+  }
 }
 
 async function fillTiles() {
@@ -73,30 +83,37 @@ async function fillTiles() {
     const {x,y,w,h} = state.spaceLeft;
     const s = Math.min(w,h);
     if (s > 0) {
-      state.filledTiles.push({x,y,s});
-      state.spaceLeft = nextSpace(state.spaceLeft);
+      const {tile,spaceLeft} = cutSpace(state.spaceLeft);
+      state.tiles.push(tile);
+      state.spaceLeft = spaceLeft;
       draw();
       await delay(s*15);
-    } else {
-      draw();
-      break;
+    }
+    else {
+      const tile = state.tiles[currentTileIndex()];
+      if (tile) {
+        tile.rowsFilled++;
+        draw();
+        await delay(20);
+      } else {
+        break;
+      }
     }
   }
 }
 
 async function animateTiles() {
-  state.filledTiles = [];
+  state.tiles = [];
   state.spaceLeft = {x:0,y:0,w:state.w,h:state.h};
 
   if (!state.animating) {
     state.animating = true;
     await delay(400);
     await fillTiles();
-    await backfillTiles();
-    state.animating = false;
     await delay(300);
-    state.filledTiles = [];
-    draw();
+    state.tiles = [];
+    // draw();
+    state.animating = false;
   }
 }
 
@@ -116,7 +133,7 @@ const fontSize = 20;
 const smallFontSize = 16;
 
 function shouldShowTiles() {
-  const scale = gcd(state.w, state.h);
+  const {scale} = state;
   return scale !== 1 && !state.animating;
 }
 
@@ -149,12 +166,13 @@ function drawTileSizeIndicator(x,y,size) {
 }
 
 function drawNonCoprimes(fillStyle) {
-  for (let x=1; x<=virtualW/unitSize; x++) {
-    for (let y=1; y<=virtualH/unitSize; y++) {
+  for (let x=1; x<=canvasW/unitSize; x++) {
+    for (let y=1; y<=canvasH/unitSize; y++) {
+      const {w,h} = state;
       const scale = gcd(x,y);
       if (scale !== 1) {
         drawTileSizeIndicator(x*unitSize,y*unitSize,scale);
-        ctx.strokeStyle = (x === state.w && y === state.h) ? '#555' : 'rgba(0,0,0,0.05)';
+        ctx.strokeStyle = (x === w && y === h) ? '#555' : 'rgba(0,0,0,0.05)';
         ctx.stroke();
       }
     }
@@ -178,9 +196,9 @@ function drawTileLabel(x,y,s) {
 }
 
 function drawBoxLabels() {
-  const w = state.w * unitSize;
-  const h = state.h * unitSize;
-  const scale = gcd(state.w, state.h);
+  const {w,h,scale} = state;
+  const pixelW = w * unitSize;
+  const pixelH = h * unitSize;
 
   const pad = unitSize/2;
   ctx.font = `${fontSize}px Helvetica`;
@@ -191,32 +209,32 @@ function drawBoxLabels() {
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   ctx.fillStyle = activeFill;
-  ctx.fillText(state.h, w + pad, h/2);
+  ctx.fillText(state.h, pixelW + pad, pixelH/2);
 
   // show width
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
   ctx.fillStyle = activeFill;
-  ctx.fillText(state.w, w/2, h + pad + fontSize/2);
+  ctx.fillText(w, pixelW/2, pixelH + pad + fontSize/2);
 
   // show tile info
   if (shouldShowTiles()) {
     let x,y,text,tiles;
-    const widthLabelPad = ctx.measureText(state.w).width;
-    const heightLabelPad = ctx.measureText(state.h).width;
+    const widthLabelPad = ctx.measureText(w).width;
+    const heightLabelPad = ctx.measureText(h).width;
     ctx.font = `${smallFontSize}px Helvetica`;
 
     // show height in terms of tiles
     if (state.h <= 10) {
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'left';
-      x = w + 2*pad + heightLabelPad;
-      y = h/2;
+      x = pixelW + 2*pad + heightLabelPad;
+      y = pixelH/2;
     } else {
       ctx.textBaseline = 'top';
       ctx.textAlign = 'left';
-      x = w + pad;
-      y = h/2 + pad*1.5;
+      x = pixelW + pad;
+      y = pixelH/2 + pad*1.5;
     }
     tiles = state.h/scale;
     text = `(${tiles} tile${tiles>1?'s':''} high)`;
@@ -224,63 +242,79 @@ function drawBoxLabels() {
     ctx.fillText(text, x, y);
 
     // show width in terms of tiles
-    if (state.w <= 10) {
+    if (w <= 10) {
       ctx.textBaseline = 'top';
-      ctx.textAlign = state.w <= 4 ? 'left' : 'center';
-      x = w/2;
-      y = h + pad + fontSize;
+      ctx.textAlign = w <= 4 ? 'left' : 'center';
+      x = pixelW/2;
+      y = pixelH + pad + fontSize;
     } else {
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'left';
-      x = w/2 + pad + widthLabelPad/2;
-      y = h + pad + fontSize/2;
+      x = pixelW/2 + pad + widthLabelPad/2;
+      y = pixelH + pad + fontSize/2;
     }
     ctx.fillStyle = inactiveFill;
-    tiles = state.w/scale;
+    tiles = w/scale;
     text = `(${tiles} tile${tiles>1?'s':''} wide)`;
     ctx.fillText(text, x, y);
 
-    drawTileLabel(state.w - scale, state.h - scale, scale);
+    drawTileLabel(w - scale, h - scale, scale);
   }
 }
 
 function drawBox() {
-  const w = state.w * unitSize;
-  const h = state.h * unitSize;
-  const scale = gcd(state.w, state.h);
+  const {w,h,scale} = state;
+  const pixelW = w * unitSize;
+  const pixelH = h * unitSize;
 
   ctx.strokeStyle = boxStroke;
   ctx.fillStyle = boxFill;
-  ctx.fillRect(0, 0, w, h);
-  ctx.strokeRect(0, 0, w, h);
+  ctx.fillRect(0, 0, pixelW, pixelH);
+  ctx.strokeRect(0, 0, pixelW, pixelH);
 }
 
 function drawTileAnimation() {
+  const {w,h,scale} = state;
   if (shouldShowTiles()) {
-    const w = state.w * unitSize;
-    const h = state.h * unitSize;
-    const scale = gcd(state.w, state.h);
-    drawGrid(virtualW, virtualH, scale*unitSize, tileStrokeOut);
-    drawGrid(w, h, scale*unitSize, tileStrokeIn);
+    const pixelW = w * unitSize;
+    const pixelH = h * unitSize;
+    drawGrid(canvasW, canvasH, scale*unitSize, tileStrokeOut);
+    drawGrid(pixelW, pixelH, scale*unitSize, tileStrokeIn);
     ctx.fillStyle = tileFill;
     ctx.strokeStyle = tileStrokeIn;
-    ctx.fillRect(0, 0, w, h);
-    ctx.strokeRect(0, 0, w, h);
+    ctx.fillRect(0, 0, pixelW, pixelH);
+    ctx.strokeRect(0, 0, pixelW, pixelH);
   }
   else {
-    for (let {x,y,s} of state.filledTiles) {
+    for (let tile of state.tiles) {
+      const {x,y,s} = tile;
       ctx.fillStyle = tileFill;
       ctx.strokeStyle = tileStrokeIn;
       ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
       ctx.strokeRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
-      drawTileLabel(x,y,s);
+
+      // draw rows
+      const {rowsFilled, fillDir} = tile;
+      if (s === scale || rowsFilled === 0) {
+        drawTileLabel(x,y,s);
+      } else {
+        ctx.save();
+        if (fillDir === 'left')    { ctx.translate((x+s)*unitSize, y*unitSize); ctx.rotate(Math.PI/2); }
+        else if (fillDir === 'up') { ctx.translate((x+s)*unitSize, (y+s)*unitSize); ctx.rotate(Math.PI); }
+        for (let row=0; row<rowsFilled; row++) {
+          for (let col=0; col<s/scale; col++) {
+            ctx.strokeRect(col*unitSize*scale, row*unitSize*scale, scale*unitSize, scale*unitSize);
+          }
+        }
+        ctx.restore();
+      }
     }
   }
 }
 
 function draw() {
-  ctx.clearRect(0,0,virtualW,virtualH);
-  drawGrid(virtualW, virtualH, unitSize, unitStroke);
+  ctx.clearRect(0,0,canvasW,canvasH);
+  drawGrid(canvasW, canvasH, unitSize, unitStroke);
   drawNonCoprimes();
   drawBox();
   drawTileAnimation();
@@ -294,6 +328,7 @@ function draw() {
 async function resizeBoxToMouse(e, resizeW, resizeH) {
   if (resizeW) { state.w = Math.max(1, Math.round(e.offsetX / unitSize)); }
   if (resizeH) { state.h = Math.max(1, Math.round(e.offsetY / unitSize)); }
+  state.scale = gcd(state.w, state.h);
 
   if (state.animate) {
     animateTiles();
