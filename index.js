@@ -344,11 +344,39 @@ function drawScrubLayer() {
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
     ctx.fillRect(0,y,window.innerWidth,h*2.2);
 
-    for (let {name,duration,start} of allPhases()) {
+    // how far marker pokes out of timeline
+    const m = 4;
+
+    for (let {name,duration,start} of state.animate.phases) {
       const x = start / state.animate.total * window.innerWidth;
       const w = duration / state.animate.total * window.innerWidth;
       const dark = '#555';
       const light = '#fff';
+
+      // draw timeline markers for each tile
+      if (name === 'fill') {
+        for (let {fillStart} of state.tiles) {
+          const lx = x + fillStart * duration / state.animate.total * window.innerWidth;
+          ctx.beginPath();
+          ctx.moveTo(lx, y+h);
+          ctx.lineTo(lx, y+h+m);
+          ctx.strokeStyle = dark;
+          ctx.stroke();
+        }
+      }
+      else if (name === 'backfill') {
+        for (let {backfillStart} of state.tiles) {
+          if (backfillStart == null) {
+            continue;
+          }
+          const lx = x + backfillStart * duration / state.animate.total * window.innerWidth;
+          ctx.beginPath();
+          ctx.moveTo(lx, y+h);
+          ctx.lineTo(lx, y+h+m);
+          ctx.strokeStyle = dark;
+          ctx.stroke();
+        }
+      }
 
       ctx.strokeStyle = dark;
       ctx.strokeRect(x,y,w,h);
@@ -402,9 +430,8 @@ function drawScrubLayer() {
         ctx.restore();
       }
 
-      const m = 8;
       ctx.beginPath();
-      ctx.rect(mouseX-m/2, -s/2-m/2, m, s+m);
+      ctx.rect(mouseX-m, -s/2-m, 2*m, s+2*m);
       ctx.strokeStyle = dark;
       ctx.fillStyle = light;
       ctx.fill();
