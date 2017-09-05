@@ -391,7 +391,8 @@ function drawTileHighlight(tile, time) {
     ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
     ctx.strokeRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
     ctx.save();
-    ctx.globalAlpha = (1 - time) / 1;
+    const fade = 0.5;
+    ctx.globalAlpha = time < (1-fade) ? 1 : (1 - time) / fade;
     drawTileLabel(x,y,s);
     ctx.restore();
   }
@@ -570,9 +571,12 @@ function updateCursor(e) {
 function createMouseEvents() {
   let resizeW = false;
   let resizeH = false;
+  let mouseX, mouseY;
   document.body.onkeydown = (e) => {
     if (e.key === 'Shift') {
       state.animate.scrubbing = true;
+      state.animate.t = state.animate.total * mouseX / window.innerWidth;
+      draw();
       updateCursor(e);
     }
   };
@@ -596,8 +600,10 @@ function createMouseEvents() {
     resizeBoxToMouse(e, resizeW, resizeH);
   };
   canvas.onmousemove = (e) => {
+    mouseX = e.offsetX;
+    mouseY = e.offsetY;
     if (state.animate.scrubbing) {
-      state.animate.t = state.animate.total * e.offsetX / window.innerWidth;
+      state.animate.t = state.animate.total * mouseX / window.innerWidth;
       draw();
     } else if (resizeH || resizeW) {
       resizeBoxToMouse(e, resizeW, resizeH);
