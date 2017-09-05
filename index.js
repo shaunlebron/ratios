@@ -74,32 +74,6 @@ function gcd(x,y) {
 // Tile Creation
 //----------------------------------------------------------------------
 
-// New plan is to make animation easier and as a side benefit make it scrubbable
-// so the user can focus on parts they are interested in to learn it better.
-
-// We must first create a list of tiles, easy enough.
-// Then we need a draw function that draws all tiles at a given time.
-
-// Timeline:
-//           1s?              400ms              1s?
-// |----------------------|-----------|------------------------|
-// |                      |           |                        |
-// | Fill tiles           | Highlight | Backfill large tiles   |
-// |                      | last tile |                        |
-// |                      |           |                        |
-// |----------------------|-----------|------------------------|
-
-// Each tile has its own time markers so it can draw itself at any given time:
-// - fillStart
-// - fillEnd
-// - highlightStart
-// - highlightEnd
-// - backfillStart
-// - backfillEnd
-
-// Time can be distributed linearly based on distance traveled during animation,
-// or just equal time for each tile.
-
 function cutSpace({x,y,w,h,lastFillDir}) {
   // Given a `spaceLeft` to fill, we cut out biggest possible square from it and
   // return both parts.
@@ -112,7 +86,7 @@ function cutSpace({x,y,w,h,lastFillDir}) {
   tile.rowsFilled = 0;
   if (w > h)      { spaceLeft.x += tile.s; spaceLeft.w -= tile.s; tile.fillDir = 'x'; }
   else if (w < h) { spaceLeft.y += tile.s; spaceLeft.h -= tile.s; tile.fillDir = 'y'; }
-  else         {
+  else {
     spaceLeft.x += tile.s;
     spaceLeft.y += tile.s;
     spaceLeft.w = spaceLeft.h = 0;
@@ -135,12 +109,10 @@ function* allTiles(w,h) {
 function addAnimToTiles(tiles) {
   const pause = 2;
   const total = tiles.reduce((sum, {s}) => sum+s+pause, 0);
-  // const total = tiles.length;
   let i = 0;
   for (let tile of tiles) {
     tile.fillStart = i/total;
     i += tile.s+pause;
-    // i++;
     tile.fillEnd = i/total;
     tile.fillLength = tile.fillEnd - tile.fillStart;
   }
@@ -220,7 +192,7 @@ function drawNonCoprimes(fillStyle) {
       const scale = gcd(x,y);
       if (scale !== 1) {
         drawTileSizeIndicator(x*unitSize,y*unitSize,scale);
-        ctx.strokeStyle = (x === w && y === h) ? '#555' : 'rgba(0,0,0,0.05)';
+        ctx.strokeStyle = (x === w && y === h) ? '#555' : 'rgba(0,0,0,0.06)';
         ctx.stroke();
       }
     }
@@ -276,6 +248,7 @@ function drawBoxSizeTileLabels() {
   const inactiveFill = 'rgb(130, 140, 160)';
 
   let x,y,text,tiles;
+  ctx.font = `${fontSize}px Helvetica`;
   const widthLabelPad = ctx.measureText(w).width;
   const heightLabelPad = ctx.measureText(h).width;
   ctx.font = `${smallFontSize}px Helvetica`;
@@ -491,19 +464,30 @@ function getPhase(t) {
   return { phase: p.name, time: 1 };
 }
 
+function getPhaseTime(name) {
+  let t = 0;
+  for (let phase of allPhases()) {
+    if (phase.name === name) {
+      return t;
+    }
+    t += phase.time;
+  }
+}
+
 function initAnim() {
-  const skip = (state.scale === 1 || state.tiles[0].s === state.scale);
-  animPhaseNames.backfill.skip = skip
+  // skip some phases
+  animPhaseNames.backfill.skip = (state.scale === 1 || state.tiles[0].s === state.scale);
+  animPhaseNames.fadeout.skip = (state.scale === 1);
+
   const phases = Array.from(allPhases());
   const total = phases.reduce((sum, {time}) => sum+time, 0);
   state.animate.phases = phases;
   state.animate.total = total;
-  state.animate.t = state.animate.enabled ? 0 : total;
+  state.animate.t = state.animate.enabled ? getPhaseTime('highlight') : total;
 }
 
 function drawAnimLayer(t) {
-  const {phase, time} = getPhase(t);
-  console.log('phase', phase);
+  let {phase, time} = getPhase(t);
   if (phase === 'wait') {
     return;
   }
@@ -515,9 +499,11 @@ function drawAnimLayer(t) {
     ctx.globalAlpha *= time;
     if (state.scale !== 1) {
       drawTileGrid();
-      drawBoxSizeTileLabels();
     }
     ctx.restore();
+  }
+  if (state.scale !== 1 && t >= getPhaseTime('highlight')) {
+    drawBoxSizeTileLabels();
   }
 }
 
@@ -599,6 +585,9 @@ function createMouseEvents() {
     if (e.key === 'Shift') {
       state.animate.scrubbing = false;
       updateCursor(e);
+    }
+    if (e.key === 'Enter') {
+      state.animate.t = 0;
     }
   };
   canvas.onmousedown = (e) => {
