@@ -17,7 +17,7 @@ const state = {
 };
 
 const animPhases = [
-  {name:'fill', duration: 1000},
+  {name:'fill', duration: 1400},
   {name:'found', duration: null}, // set by initAnim
   {name:'backfill', duration: 1000},
 ];
@@ -156,6 +156,9 @@ const coprimeFill = 'rgba(10,40,70,0.3)';
 const fontSize = 20;
 const smallFontSize = 16;
 
+const activeTextFill = '#555';
+const inactiveTextFill = 'rgb(130, 140, 160)';
+
 // draw a simple grid in the given area
 function drawGrid(w, h, unit, strokeStyle) {
   ctx.beginPath();
@@ -226,18 +229,17 @@ function drawBoxSizeLabels() {
 
   const pad = unitSize/2;
   ctx.font = `${fontSize}px Helvetica`;
-  const activeFill = '#555';
 
   // show height
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
-  ctx.fillStyle = activeFill;
+  ctx.fillStyle = activeTextFill;
   ctx.fillText(state.h, pixelW + pad, pixelH/2);
 
   // show width
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
-  ctx.fillStyle = activeFill;
+  ctx.fillStyle = activeTextFill;
   ctx.fillText(w, pixelW/2, pixelH + pad + fontSize/2);
 }
 
@@ -246,8 +248,6 @@ function drawBoxSizeTileLabels() {
   const pixelW = w * unitSize;
   const pixelH = h * unitSize;
   const pad = unitSize/2;
-
-  const inactiveFill = 'rgb(130, 140, 160)';
 
   let x,y,text,tiles;
   ctx.font = `${fontSize}px Helvetica`;
@@ -269,7 +269,7 @@ function drawBoxSizeTileLabels() {
   }
   tiles = state.h/scale;
   text = `(${tiles} tile${tiles>1?'s':''} high)`;
-  ctx.fillStyle = inactiveFill;
+  ctx.fillStyle = inactiveTextFill;
   ctx.fillText(text, x, y);
 
   // show width in terms of tiles
@@ -284,7 +284,7 @@ function drawBoxSizeTileLabels() {
     x = pixelW/2 + pad + widthLabelPad/2;
     y = pixelH + pad + fontSize/2;
   }
-  ctx.fillStyle = inactiveFill;
+  ctx.fillStyle = inactiveTextFill;
   tiles = w/scale;
   text = `(${tiles} tile${tiles>1?'s':''} wide)`;
   ctx.fillText(text, x, y);
@@ -337,17 +337,19 @@ function drawScrubLayer() {
     ctx.save();
     ctx.translate(0, mouseY);
     const {phase,time} = getPhase(state.animate.t);
+
+    // background and border
+    const y = -s/2;
+    const h = s;
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillRect(0,y,window.innerWidth,h*2.2);
+
     for (let {name,duration,start} of allPhases()) {
       const x = start / state.animate.total * window.innerWidth;
       const w = duration / state.animate.total * window.innerWidth;
-      const y = -s/2;
-      const h = s;
       const dark = '#555';
       const light = '#fff';
 
-      // background and border
-      ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      ctx.fillRect(x,y,w,h*2.2);
       ctx.strokeStyle = dark;
       ctx.strokeRect(x,y,w,h);
 
@@ -361,25 +363,29 @@ function drawScrubLayer() {
       const {scale} = state;
       if (name === 'fill') {
         title = 'Fill with large squares';
-        caption = 'Insert largest fitting square tiles, i.e. min(w,h) of remaining space.';
+        caption = 'Insert largest fitting square tiles (i.e. smallest side of remaining space).';
       }
       else if (name === 'found') {
         if (state.scale === 1) {
           title = `Identify simplest unit: (${scale}x${scale})`;
-          caption = 'A 1x1 tile means the space dimensions are already simplified (coprime).';
+          caption = 'A 1x1 tile means the space dimensions are already simplified (i.e. coprime).';
         } else {
           title = `Identify simplest unit: (${scale}x${scale})`;
-          caption = 'Last tile is the largest to evenly divide the whole space.';
+          caption = 'Last tile inserted is the largest to evenly divide the whole space.';
         }
       }
       else if (name === 'backfill') {
         title = 'Subdivide previous squares';
         caption = 'Extend the new unit tiles into the previous squares until covered.';
       }
-      ctx.fillStyle = dark;
+      ctx.fillStyle = activeTextFill;
       ctx.fillText(title, x + s/4, 0);
       if (phase == name) {
+        ctx.save();
+        ctx.globalAlpha *= 0.7;
+        ctx.fillStyle = inactiveTextFill;
         ctx.fillText(caption, x + s/4, s*1.1);
+        ctx.restore();
       }
 
 
@@ -425,14 +431,66 @@ function draw() {
 
 function drawTileFill(tile, time) {
   const {fillStart, fillLength} = tile;
+  const {x,y,s,fillDir} = tile;
   if (time < fillStart) {
     // draw nothing
+  } else if (time < fillStart+fillLength) {
+    // draw sweeping arc to clarify how the size is chosen
+    ctx.beginPath();
+    ctx.moveTo(x*unitSize, y*unitSize);
+    const t = Math.min(1, (time - fillStart) / fillLength);
+    const a = t*Math.PI/2;
+    let startA, endA, cc;
+    if (fillDir === 'x') {
+      startA = Math.PI/2;
+      endA = startA-a;
+      cc = true;
+    } else if (fillDir === 'y') {
+      startA = 0;
+      endA = a;
+      cc = false;
+    }
+    ctx.save();
+    ctx.globalAlpha *= t;
+    ctx.fillStyle = tileFill;
+    ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+    ctx.restore();
+
+    ctx.ellipse(x*unitSize, y*unitSize, s*unitSize, s*unitSize, 0, startA, endA, cc);
+    ctx.strokeStyle = tileFill;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x*unitSize, y*unitSize);
+    ctx.lineTo((x + s*Math.cos(endA)) * unitSize, (y + s*Math.sin(endA)) * unitSize);
+    ctx.strokeStyle = boxStroke;
+    ctx.stroke();
+
+    // show the radius length of the sweeping arc
+    if (s > 3) {
+      ctx.font = `${smallFontSize}px Helvetica`;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+      const textInside = a > Math.PI/4;
+      ctx.fillStyle = textInside ? '#fff' : inactiveTextFill;
+      const textDist = 0.7;
+      let textA;
+      if (fillDir === 'x') {
+        textA = endA + Math.PI/2 * (textInside ? 1 : -1);
+      } else if (fillDir === 'y') {
+        textA = endA + Math.PI/2 * (textInside ? -1 : 1);
+      }
+      ctx.fillText(
+        s,
+        (x + s/2*Math.cos(endA) + textDist*Math.cos(textA)) * unitSize,
+        (y + s/2*Math.sin(endA) + textDist*Math.sin(textA)) * unitSize
+      );
+    }
   } else {
     // draw growing tile
     const t = Math.min(1, (time - fillStart) / fillLength);
-    const {x,y,s} = tile;
-    const w = s * (tile.fillDir === 'x' ? t : 1);
-    const h = s * (tile.fillDir === 'y' ? t : 1);
+    const w = s * (fillDir === 'x' ? t : 1);
+    const h = s * (fillDir === 'y' ? t : 1);
     ctx.fillStyle = tileFill;
     ctx.strokeStyle = tileStrokeIn;
     ctx.fillRect(x*unitSize, y*unitSize, w*unitSize, h*unitSize);
