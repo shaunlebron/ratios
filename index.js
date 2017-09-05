@@ -17,7 +17,7 @@ const state = {
 const animPhases = [
   {name:'fill', time: 1000},
   {name:'highlight', time: 400},
-  {name:'backfill', time: 1000},
+  {name:'backfill', time: 1600},
 ];
 const animPhaseNames = {};
 for (let phase of Object.values(animPhases)) {
@@ -237,11 +237,11 @@ function drawTileLabel(x,y,s) {
   ctx.textBaseline = 'bottom';
   ctx.textAlign = 'right';
   ctx.fillStyle = '#fff';
-  ctx.strokeStyle = boxStroke;
+  // ctx.strokeStyle = boxStroke;
   const tx = (x+s - 0.3) * unitSize;
   const ty = (y+s - 0.3) * unitSize;
   const text = `${s}x${s}`;
-  ctx.strokeText(text, tx, ty);
+  // ctx.strokeText(text, tx, ty);
   ctx.fillText(text, tx, ty);
 }
 
@@ -374,6 +374,7 @@ function drawTileFill(tile, time) {
     }
   }
 }
+
 function drawTileHighlight(tile, time) {
   const {x,y,s,isLast} = tile;
   if (isLast) {
@@ -389,7 +390,10 @@ function drawTileHighlight(tile, time) {
     ctx.strokeStyle = tileStrokeIn;
     ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
     ctx.strokeRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+    ctx.save();
+    ctx.globalAlpha = (1 - time) / 1;
     drawTileLabel(x,y,s);
+    ctx.restore();
   }
 }
 
@@ -397,15 +401,27 @@ function drawTileBackfill(tile, time) {
   const {x,y,s,scale,fillDir} = tile;
   const {backfillStart, backfillLength} = tile;
 
-  // draw tile outlines
-  ctx.strokeStyle = tileStrokeIn;
-  ctx.strokeRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
-
-  if (backfillStart == null) {
+  if (tile.isLast) {
+    drawTileHighlight(tile, 1);
+  }
+  else if (backfillStart == null) {
     ctx.fillStyle = tileFill;
     ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+    ctx.strokeStyle = tileStrokeIn;
+    ctx.strokeRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
   }
-  else if (time > backfillStart) {
+  else if (time < backfillStart) {
+    ctx.fillStyle = tileFill;
+    ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+    ctx.strokeStyle = tileStrokeIn;
+    ctx.strokeRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+  }
+  else {
+    ctx.fillStyle = tileFill;
+    ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+    ctx.strokeStyle = tileStrokeIn;
+    ctx.strokeRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
+
     const t = Math.min(1, (time - backfillStart) / backfillLength);
     const numTiles = s / scale;
     const rowProgress = t * numTiles;
@@ -419,7 +435,6 @@ function drawTileBackfill(tile, time) {
     ctx.save();
     if (fillDir === 'x')      { ctx.translate((x+s)*unitSize, y*unitSize); ctx.rotate(Math.PI/2); }
     else if (fillDir === 'y') { ctx.translate((x+s)*unitSize, (y+s)*unitSize); ctx.rotate(Math.PI); }
-    ctx.fillStyle = tileFill;
     ctx.strokeStyle = tileStrokeIn;
     for (let row=0; row<rows; row++) {
       const h = scale*unitSize*(row === rows-1 ? lastRowScale : 1);
@@ -427,7 +442,6 @@ function drawTileBackfill(tile, time) {
         const x = col*scale*unitSize;
         const y = row*scale*unitSize;
         const w = scale*unitSize;
-        ctx.fillRect(x, y, w, h);
         ctx.strokeRect(x, y, w, h);
       }
     }
@@ -492,6 +506,7 @@ function advanceAnim(dt) {
   draw();
   if (state.animate.t > state.animate.total) {
     state.animate.t = null;
+    draw();
   }
 }
 
