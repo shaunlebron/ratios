@@ -3,3 +3,17 @@ canvas {
   top: 0;
   left: 0;
 }
+
+footer {
+  font-family: Helvetica;
+  font-style: italic;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  padding: 20px;
+}
+
+a {
+  color: #739ddc;
+  text-decoration: none;
+}

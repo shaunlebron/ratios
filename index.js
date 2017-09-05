@@ -33,6 +33,8 @@ function updateSize(w,h) {
   state.tiles = createTiles(w,h);
   initAnim();
   draw();
+  localStorage.w = w;
+  localStorage.h = h;
 }
 
 const unitSize = 20; // pixel size of single unit
@@ -569,7 +571,7 @@ function getPhaseTime(name) {
 function initAnim() {
   // adjust some animation phases depending on tile result
   animPhaseNames.found.duration = (state.scale === 1 ? 800 : 800);
-  animPhaseNames.backfill.skip = (state.scale === 1 || state.tiles[0].s === state.scale);
+  animPhaseNames.backfill.skip = (state.scale === 1);
 
   const phases = Array.from(allPhases());
   const total = setPhaseTimes(phases);
@@ -647,7 +649,7 @@ function getCursor(e) {
 
 function updateCursor(e) {
   const cursor = getCursor(e);
-  document.body.style.cursor = cursor;
+  canvas.style.cursor = cursor;
 }
 
 function createMouseEvents() {
@@ -709,7 +711,10 @@ function createMouseEvents() {
 // Load
 //----------------------------------------------------------------------
 
-updateSize(35,20);
+updateSize(
+  parseInt(localStorage.w, 10) || 36,
+  parseInt(localStorage.h, 10) || 22
+);
 resizeCanvas();
 createMouseEvents();
 window.requestAnimationFrame(tick);
