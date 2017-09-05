@@ -5,6 +5,8 @@ const state = {
   h: null, // box height
   scale: null, // box tile size
   tiles: [], // tiles {x,y,s} added during animation
+  mouseX: 0,
+  mouseY: window.innerHeight*0.75,
   animate: {
     scrubbing: false,
     enabled: true,
@@ -15,11 +17,9 @@ const state = {
 };
 
 const animPhases = [
-  {name:'wait', time: 200},
-  {name:'fill', time: 1000},
-  {name:'highlight', time: 800},
-  {name:'backfill', time: 1000},
-  {name:'fadeout', time: 200},
+  {name:'fill', duration: 1000},
+  {name:'found', duration: null}, // set by initAnim
+  {name:'backfill', duration: 1000},
 ];
 const animPhaseNames = {};
 for (let phase of Object.values(animPhases)) {
@@ -148,8 +148,8 @@ const boxFill = 'rgba(40,70,100,0.15)';
 const tileFill = 'rgba(40,70,100,0.15)';
 const boxStroke = '#555';
 
-const successFill = 'rgba(0,255,0,0.4)';
-const failureFill = 'rgba(255,0,0,0.4)';
+const noncoprimeFill = 'rgba(10,40,70,0.2)';
+const coprimeFill = 'rgba(10,40,70,0.3)';
 
 const fontSize = 20;
 const smallFontSize = 16;
@@ -314,6 +314,99 @@ function drawTileGrid() {
   ctx.strokeRect(0, 0, pixelW, pixelH);
 }
 
+function drawScrubLayer() {
+  // show instructions
+  const size = 14;
+  ctx.font = `${size}px monospace`;
+  ctx.fillStyle = boxStroke;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
+  ctx.save();
+  ctx.fillText('             Click = resize ', window.innerWidth-size, size);
+  ctx.translate(0, size*1.5);
+  ctx.fillText('             Enter = animate', window.innerWidth-size, size);
+  ctx.translate(0, size*1.5);
+  ctx.fillText('Shift + Mouse move = study  ', window.innerWidth-size, size);
+  ctx.restore();
+
+  if (state.animate.scrubbing) {
+    const {mouseX, mouseY} = state;
+    const s = 28;
+    ctx.save();
+    ctx.translate(0, mouseY);
+    const {phase,time} = getPhase(state.animate.t);
+    for (let {name,duration,start} of allPhases()) {
+      const x = start / state.animate.total * window.innerWidth;
+      const w = duration / state.animate.total * window.innerWidth;
+      const y = -s/2;
+      const h = s;
+      const dark = '#555';
+      const light = '#fff';
+
+      // background and border
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.fillRect(x,y,w,h*2.2);
+      ctx.strokeStyle = dark;
+      ctx.strokeRect(x,y,w,h);
+
+      // label
+      ctx.font = `${s*0.5}px Helvetica`;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+
+      let title;
+      let caption;
+      const {scale} = state;
+      if (name === 'fill') {
+        title = 'Fill with large squares';
+        caption = 'Insert largest fitting square tiles, i.e. min(w,h) of remaining space.';
+      }
+      else if (name === 'found') {
+        if (state.scale === 1) {
+          title = `Identify simplest unit: (${scale}x${scale})`;
+          caption = 'A 1x1 tile means the space dimensions are already simplified (coprime).';
+        } else {
+          title = `Identify simplest unit: (${scale}x${scale})`;
+          caption = 'Last tile is the largest to evenly divide the whole space.';
+        }
+      }
+      else if (name === 'backfill') {
+        title = 'Subdivide previous squares';
+        caption = 'Extend the new unit tiles into the previous squares until covered.';
+      }
+      ctx.fillStyle = dark;
+      ctx.fillText(title, x + s/4, 0);
+      if (phase == name) {
+        ctx.fillText(caption, x + s/4, s*1.1);
+      }
+
+
+      // progress bar
+      if (phase === name) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x,y,w*time,h);
+        ctx.fillStyle = dark;
+        ctx.fill();
+        ctx.clip();
+        ctx.fillStyle = light;
+        ctx.fillText(title, x + s/4, 0);
+        ctx.restore();
+      }
+
+      const m = 8;
+      ctx.beginPath();
+      ctx.rect(mouseX-m/2, -s/2-m/2, m, s+m);
+      ctx.strokeStyle = dark;
+      ctx.fillStyle = light;
+      ctx.fill();
+      ctx.stroke();
+    }
+    // ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function draw() {
   ctx.clearRect(0,0,canvasW,canvasH);
   drawGrid(canvasW, canvasH, unitSize, unitStroke);
@@ -321,6 +414,7 @@ function draw() {
   drawBox();
   drawBoxSizeLabels();
   drawAnimLayer(state.animate.t);
+  drawScrubLayer();
 }
 
 //----------------------------------------------------------------------
@@ -347,12 +441,12 @@ function drawTileFill(tile, time) {
   }
 }
 
-function drawTileHighlight(tile, time) {
+function drawTileFound(tile, time) {
   const {x,y,s,scale,isLast} = tile;
   if (isLast) {
     ctx.fillStyle = tileFill;
     ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
-    ctx.fillStyle = (s === 1) ? failureFill : successFill;
+    ctx.fillStyle = (s === 1) ? coprimeFill : noncoprimeFill;
     ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
     ctx.strokeStyle = tileStrokeIn;
     ctx.strokeRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
@@ -371,13 +465,10 @@ function drawTileHighlight(tile, time) {
 }
 
 function drawTileBackfill(tile, time) {
-  const {x,y,s,scale,fillDir} = tile;
+  const {x,y,s,scale} = tile;
   const {backfillStart, backfillLength} = tile;
 
-  if (tile.isLast) {
-    drawTileHighlight(tile, 1);
-  }
-  else if (backfillStart == null) {
+  if (backfillStart == null) {
     ctx.fillStyle = tileFill;
     ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
     ctx.strokeStyle = tileStrokeIn;
@@ -405,40 +496,38 @@ function drawTileBackfill(tile, time) {
       lastRowScale = 1;
     }
 
-    ctx.save();
-    if (fillDir === 'x')      { ctx.translate((x+s)*unitSize, y*unitSize); ctx.rotate(Math.PI/2); }
-    else if (fillDir === 'y') { ctx.translate((x+s)*unitSize, (y+s)*unitSize); ctx.rotate(Math.PI); }
-    ctx.strokeStyle = tileStrokeIn;
-    for (let row=0; row<rows; row++) {
-      const h = scale*unitSize*(row === rows-1 ? lastRowScale : 1);
-      for (let col=0; col<cols; col++) {
-        const x = col*scale*unitSize;
-        const y = row*scale*unitSize;
-        const w = scale*unitSize;
-        ctx.strokeRect(x, y, w, h);
+    // instead of using tile.fillDir, we use both to show why the square tiles
+    // do in fact fit correctly when backfilling.
+    for (let fillDir of ['x', 'y']) {
+      ctx.save();
+      if (fillDir === 'x')      { ctx.translate((x+s)*unitSize, y*unitSize); ctx.rotate(Math.PI/2); }
+      else if (fillDir === 'y') { ctx.translate((x+s)*unitSize, (y+s)*unitSize); ctx.rotate(Math.PI); }
+      ctx.strokeStyle = tileStrokeIn;
+      for (let row=0; row<rows; row++) {
+        const h = scale*unitSize*(row === rows-1 ? lastRowScale : 1);
+        for (let col=0; col<cols; col++) {
+          const x = col*scale*unitSize;
+          const y = row*scale*unitSize;
+          const w = scale*unitSize;
+          ctx.beginPath();
+          ctx.moveTo(x,y);
+          ctx.lineTo(x,y+h);
+          ctx.moveTo(x+w,y);
+          ctx.lineTo(x+w,y+h);
+          ctx.stroke();
+          // ctx.strokeRect(x, y, w, h);
+        }
       }
+      ctx.restore();
     }
-    ctx.restore();
   }
 }
 
 function drawAnimTile(tile, phase, time) {
   switch (phase) {
     case 'fill': drawTileFill(tile, time); break;
-    case 'highlight': drawTileHighlight(tile, time); break;
+    case 'found': drawTileFound(tile, time); break;
     case 'backfill': drawTileBackfill(tile, time); break;
-    case 'fadeout':
-      if (time < 1) {
-        ctx.save();
-        ctx.globalAlpha *= (1-time)/1;
-        if (animPhaseNames.backfill.skip) {
-          drawTileHighlight(tile, 1);
-        } else {
-          drawTileBackfill(tile, 1);
-        }
-        ctx.restore();
-      }
-      break;
   }
 }
 
@@ -458,51 +547,43 @@ function getPhase(t) {
   const phases = state.animate.phases;
   let p;
   for (p of phases) {
-    if (t < p.time) { return { phase: p.name, time: t / p.time }; }
-    t -= p.time;
+    if (t < p.duration) { return { phase: p.name, time: t / p.duration }; }
+    t -= p.duration;
   }
   return { phase: p.name, time: 1 };
 }
 
-function getPhaseTime(name) {
+function setPhaseTimes(phases) {
   let t = 0;
-  for (let phase of allPhases()) {
-    if (phase.name === name) {
-      return t;
-    }
-    t += phase.time;
+  for (let phase of phases) {
+    phase.start = t;
+    t += phase.duration;
   }
+  return t;
+}
+
+function getPhaseTime(name) {
+  return animPhaseNames[name].start;
 }
 
 function initAnim() {
-  // skip some phases
+  // adjust some animation phases depending on tile result
+  animPhaseNames.found.duration = (state.scale === 1 ? 800 : 800);
   animPhaseNames.backfill.skip = (state.scale === 1 || state.tiles[0].s === state.scale);
-  animPhaseNames.fadeout.skip = (state.scale === 1);
 
   const phases = Array.from(allPhases());
-  const total = phases.reduce((sum, {time}) => sum+time, 0);
+  const total = setPhaseTimes(phases);
   state.animate.phases = phases;
   state.animate.total = total;
-  state.animate.t = state.animate.enabled ? getPhaseTime('highlight') : total;
+  state.animate.t = state.animate.enabled ? getPhaseTime('found') : total;
 }
 
 function drawAnimLayer(t) {
   let {phase, time} = getPhase(t);
-  if (phase === 'wait') {
-    return;
-  }
   for (let tile of state.tiles) {
     drawAnimTile(tile, phase, time);
   }
-  if (phase === 'fadeout') {
-    ctx.save();
-    ctx.globalAlpha *= time;
-    if (state.scale !== 1) {
-      drawTileGrid();
-    }
-    ctx.restore();
-  }
-  if (state.scale !== 1 && t >= getPhaseTime('highlight')) {
+  if (state.scale !== 1 && t >= getPhaseTime('found')) {
     drawBoxSizeTileLabels();
   }
 }
@@ -560,7 +641,7 @@ function getCursor(e) {
   else if (resizeW && resizeH) { cursor = 'nwse-resize'; }
   else if (resizeW)            { cursor = 'ew-resize'; }
   else if (resizeH)            { cursor = 'ns-resize'; }
-  else                         { cursor = 'default'; }
+  else                         { cursor = 'crosshair'; }
   return cursor;
 }
 
@@ -572,11 +653,10 @@ function updateCursor(e) {
 function createMouseEvents() {
   let resizeW = false;
   let resizeH = false;
-  let mouseX, mouseY;
   document.body.onkeydown = (e) => {
     if (e.key === 'Shift') {
       state.animate.scrubbing = true;
-      state.animate.t = state.animate.total * mouseX / window.innerWidth;
+      state.animate.t = state.animate.total * state.mouseX / window.innerWidth;
       draw();
       updateCursor(e);
     }
@@ -591,7 +671,7 @@ function createMouseEvents() {
     }
   };
   canvas.onmousedown = (e) => {
-    if (e.button !== 0) {
+    if (state.animate.scrubbing || e.button !== 0) {
       return;
     }
     updateCursor(e);
@@ -604,10 +684,10 @@ function createMouseEvents() {
     resizeBoxToMouse(e, resizeW, resizeH);
   };
   canvas.onmousemove = (e) => {
-    mouseX = e.offsetX;
-    mouseY = e.offsetY;
+    state.mouseX = e.offsetX;
+    state.mouseY = e.offsetY;
     if (state.animate.scrubbing) {
-      state.animate.t = state.animate.total * mouseX / window.innerWidth;
+      state.animate.t = state.animate.total * state.mouseX / window.innerWidth;
       draw();
     } else if (resizeH || resizeW) {
       resizeBoxToMouse(e, resizeW, resizeH);
