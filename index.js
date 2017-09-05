@@ -16,7 +16,7 @@ const state = {
 
 const animPhases = [
   {name:'fill', time: 1000},
-  {name:'highlight', time: 400},
+  {name:'highlight', time: 800},
   {name:'backfill', time: 1600},
 ];
 const animPhaseNames = {};
@@ -104,6 +104,9 @@ function cutSpace({x,y,w,h,lastFillDir}) {
   const spaceLeft = {x,y,w,h};
   const tile = {x,y};
   tile.s = Math.min(w,h)
+  if (tile.s === 1) {
+    tile.isLast = true; // stop early
+  }
   tile.rowsFilled = 0;
   if (w > h)      { spaceLeft.x += tile.s; spaceLeft.w -= tile.s; tile.fillDir = 'x'; }
   else if (w < h) { spaceLeft.y += tile.s; spaceLeft.h -= tile.s; tile.fillDir = 'y'; }
