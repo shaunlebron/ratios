@@ -15,9 +15,11 @@ const state = {
 };
 
 const animPhases = [
+  {name:'wait', time: 200},
   {name:'fill', time: 1000},
   {name:'highlight', time: 800},
-  {name:'backfill', time: 1600},
+  {name:'backfill', time: 1000},
+  {name:'fadeout', time: 200},
 ];
 const animPhaseNames = {};
 for (let phase of Object.values(animPhases)) {
@@ -167,7 +169,7 @@ function createTiles(w,h) {
 //----------------------------------------------------------------------
 
 const unitStroke = 'rgba(40,70,100,0.08)';
-const tileStrokeOut = 'rgba(40,70,100,0.2)';
+const tileStrokeOut = 'rgba(40,70,100,0.1)';
 const tileStrokeIn = 'rgba(40,70,100,0.4)';
 
 const boxFill = 'rgba(40,70,100,0.15)';
@@ -179,12 +181,6 @@ const failureFill = 'rgba(255,0,0,0.4)';
 
 const fontSize = 20;
 const smallFontSize = 16;
-
-// determines if we should draw static tiles
-// (not during animation and only when tiles are large enough)
-function shouldDrawStaticTiles() {
-  return state.scale !== 1 && !isAnimating();
-}
 
 // draw a simple grid in the given area
 function drawGrid(w, h, unit, strokeStyle) {
@@ -249,7 +245,7 @@ function drawTileLabel(x,y,s) {
 }
 
 // draw box dimension size labels (and in terms of tiles if applicable)
-function drawBoxLabels() {
+function drawBoxSizeLabels() {
   const {w,h,scale} = state;
   const pixelW = w * unitSize;
   const pixelH = h * unitSize;
@@ -257,7 +253,6 @@ function drawBoxLabels() {
   const pad = unitSize/2;
   ctx.font = `${fontSize}px Helvetica`;
   const activeFill = '#555';
-  const inactiveFill = 'rgb(130, 140, 160)';
 
   // show height
   ctx.textBaseline = 'middle';
@@ -270,50 +265,56 @@ function drawBoxLabels() {
   ctx.textAlign = 'center';
   ctx.fillStyle = activeFill;
   ctx.fillText(w, pixelW/2, pixelH + pad + fontSize/2);
+}
 
-  // show tile info
-  if (shouldDrawStaticTiles()) {
-    let x,y,text,tiles;
-    const widthLabelPad = ctx.measureText(w).width;
-    const heightLabelPad = ctx.measureText(h).width;
-    ctx.font = `${smallFontSize}px Helvetica`;
+function drawBoxSizeTileLabels() {
+  const {w,h,scale} = state;
+  const pixelW = w * unitSize;
+  const pixelH = h * unitSize;
+  const pad = unitSize/2;
 
-    // show height in terms of tiles
-    if (state.h <= 10) {
-      ctx.textBaseline = 'middle';
-      ctx.textAlign = 'left';
-      x = pixelW + 2*pad + heightLabelPad;
-      y = pixelH/2;
-    } else {
-      ctx.textBaseline = 'top';
-      ctx.textAlign = 'left';
-      x = pixelW + pad;
-      y = pixelH/2 + pad*1.5;
-    }
-    tiles = state.h/scale;
-    text = `(${tiles} tile${tiles>1?'s':''} high)`;
-    ctx.fillStyle = inactiveFill;
-    ctx.fillText(text, x, y);
+  const inactiveFill = 'rgb(130, 140, 160)';
 
-    // show width in terms of tiles
-    if (w <= 10) {
-      ctx.textBaseline = 'top';
-      ctx.textAlign = w <= 4 ? 'left' : 'center';
-      x = pixelW/2;
-      y = pixelH + pad + fontSize;
-    } else {
-      ctx.textBaseline = 'middle';
-      ctx.textAlign = 'left';
-      x = pixelW/2 + pad + widthLabelPad/2;
-      y = pixelH + pad + fontSize/2;
-    }
-    ctx.fillStyle = inactiveFill;
-    tiles = w/scale;
-    text = `(${tiles} tile${tiles>1?'s':''} wide)`;
-    ctx.fillText(text, x, y);
+  let x,y,text,tiles;
+  const widthLabelPad = ctx.measureText(w).width;
+  const heightLabelPad = ctx.measureText(h).width;
+  ctx.font = `${smallFontSize}px Helvetica`;
 
-    drawTileLabel(w - scale, h - scale, scale);
+  // show height in terms of tiles
+  if (state.h <= 10) {
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    x = pixelW + 2*pad + heightLabelPad;
+    y = pixelH/2;
+  } else {
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    x = pixelW + pad;
+    y = pixelH/2 + pad*1.5;
   }
+  tiles = state.h/scale;
+  text = `(${tiles} tile${tiles>1?'s':''} high)`;
+  ctx.fillStyle = inactiveFill;
+  ctx.fillText(text, x, y);
+
+  // show width in terms of tiles
+  if (w <= 10) {
+    ctx.textBaseline = 'top';
+    ctx.textAlign = w <= 4 ? 'left' : 'center';
+    x = pixelW/2;
+    y = pixelH + pad + fontSize;
+  } else {
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    x = pixelW/2 + pad + widthLabelPad/2;
+    y = pixelH + pad + fontSize/2;
+  }
+  ctx.fillStyle = inactiveFill;
+  tiles = w/scale;
+  text = `(${tiles} tile${tiles>1?'s':''} wide)`;
+  ctx.fillText(text, x, y);
+
+  drawTileLabel(w - scale, h - scale, scale);
 }
 
 // draw the current box shape
@@ -328,21 +329,16 @@ function drawBox() {
   ctx.strokeRect(0, 0, pixelW, pixelH);
 }
 
-// draw all the tile outlines and labels
-function drawTiles() {
+function drawTileGrid() {
   const {w,h,scale} = state;
-  if (shouldDrawStaticTiles()) {
-    const pixelW = w * unitSize;
-    const pixelH = h * unitSize;
-    drawGrid(canvasW, canvasH, scale*unitSize, tileStrokeOut);
-    drawGrid(pixelW, pixelH, scale*unitSize, tileStrokeIn);
-    ctx.fillStyle = tileFill;
-    ctx.strokeStyle = tileStrokeIn;
-    ctx.fillRect(0, 0, pixelW, pixelH);
-    ctx.strokeRect(0, 0, pixelW, pixelH);
-  } else if (isAnimating()) {
-    drawAnimation(state.animate.t);
-  }
+  const pixelW = w * unitSize;
+  const pixelH = h * unitSize;
+  drawGrid(canvasW, canvasH, scale*unitSize, tileStrokeOut);
+  drawGrid(pixelW, pixelH, scale*unitSize, tileStrokeIn);
+  ctx.fillStyle = tileFill;
+  ctx.strokeStyle = tileStrokeIn;
+  ctx.fillRect(0, 0, pixelW, pixelH);
+  ctx.strokeRect(0, 0, pixelW, pixelH);
 }
 
 function draw() {
@@ -350,8 +346,8 @@ function draw() {
   drawGrid(canvasW, canvasH, unitSize, unitStroke);
   drawNonCoprimes();
   drawBox();
-  drawTiles();
-  drawBoxLabels();
+  drawBoxSizeLabels();
+  drawAnimLayer(state.animate.t);
 }
 
 //----------------------------------------------------------------------
@@ -379,7 +375,7 @@ function drawTileFill(tile, time) {
 }
 
 function drawTileHighlight(tile, time) {
-  const {x,y,s,isLast} = tile;
+  const {x,y,s,scale,isLast} = tile;
   if (isLast) {
     ctx.fillStyle = tileFill;
     ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
@@ -394,8 +390,8 @@ function drawTileHighlight(tile, time) {
     ctx.fillRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
     ctx.strokeRect(x*unitSize, y*unitSize, s*unitSize, s*unitSize);
     ctx.save();
-    const fade = 0.5;
-    ctx.globalAlpha = time < (1-fade) ? 1 : (1 - time) / fade;
+    const fade = animPhaseNames.backfill.skip ? 0 : 0.5;
+    ctx.globalAlpha *= (time < (1-fade) ? 1 : (1 - time) / fade);
     drawTileLabel(x,y,s);
     ctx.restore();
   }
@@ -453,22 +449,29 @@ function drawTileBackfill(tile, time) {
   }
 }
 
-function drawTileAnimation(tile, phase, time) {
+function drawAnimTile(tile, phase, time) {
   switch (phase) {
     case 'fill': drawTileFill(tile, time); break;
     case 'highlight': drawTileHighlight(tile, time); break;
     case 'backfill': drawTileBackfill(tile, time); break;
+    case 'fadeout':
+      if (time < 1) {
+        ctx.save();
+        ctx.globalAlpha *= (1-time)/1;
+        if (animPhaseNames.backfill.skip) {
+          drawTileHighlight(tile, 1);
+        } else {
+          drawTileBackfill(tile, 1);
+        }
+        ctx.restore();
+      }
+      break;
   }
 }
 
 //----------------------------------------------------------------------
 // Animation Timing
 //----------------------------------------------------------------------
-
-function isAnimating() {
-  const {enabled,t} = state.animate;
-  return enabled && t !== null;
-}
 
 function* allPhases() {
   for (let phase of animPhases) {
@@ -489,29 +492,38 @@ function getPhase(t) {
 }
 
 function initAnim() {
-  if (!state.animate.enabled) {
-    return;
-  }
-  animPhaseNames.backfill.skip = (state.scale === 1);
-  state.animate.t = 0;
-  state.animate.phases = Array.from(allPhases());
-  state.animate.total = state.animate.phases.reduce((sum, {time}) => sum+time, 0);
+  const skip = (state.scale === 1 || state.tiles[0].s === state.scale);
+  animPhaseNames.backfill.skip = skip
+  const phases = Array.from(allPhases());
+  const total = phases.reduce((sum, {time}) => sum+time, 0);
+  state.animate.phases = phases;
+  state.animate.total = total;
+  state.animate.t = state.animate.enabled ? 0 : total;
 }
 
-function drawAnimation(t) {
+function drawAnimLayer(t) {
   const {phase, time} = getPhase(t);
+  console.log('phase', phase);
+  if (phase === 'wait') {
+    return;
+  }
   for (let tile of state.tiles) {
-    drawTileAnimation(tile, phase, time);
+    drawAnimTile(tile, phase, time);
+  }
+  if (phase === 'fadeout') {
+    ctx.save();
+    ctx.globalAlpha *= time;
+    if (state.scale !== 1) {
+      drawTileGrid();
+      drawBoxSizeTileLabels();
+    }
+    ctx.restore();
   }
 }
 
 function advanceAnim(dt) {
   state.animate.t += dt;
   draw();
-  if (state.animate.t > state.animate.total) {
-    state.animate.t = null;
-    draw();
-  }
 }
 
 let lastTime;
@@ -523,7 +535,7 @@ function tick(t) {
     dt = 0;
   }
   lastTime = t;
-  if (isAnimating() && !state.animate.scrubbing) {
+  if (state.animate.t < state.animate.total && !state.animate.scrubbing) {
     advanceAnim(dt);
   }
   window.requestAnimationFrame(tick);
