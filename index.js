@@ -335,12 +335,14 @@ function drawScrubLayer() {
     const {mouseX, mouseY} = state;
     const s = 28;
     ctx.save();
-    ctx.translate(0, mouseY);
     const {phase,time} = getPhase(state.animate.t);
 
     // background and border
     const y = -s/2;
     const h = s;
+    const bottomPad = 60;
+    ctx.translate(0, window.innerHeight - s*2 - bottomPad);
+
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
     ctx.fillRect(0,y,window.innerWidth,h*2.2);
 
